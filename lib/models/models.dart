@@ -37,6 +37,51 @@ enum EquipmentType {
 
 enum InjuryArea { shoulder, lowerBack, knee, wrist, hip, ankle, elbow, neck }
 
+enum FitnessGoal {
+  buildMuscle,
+  loseWeight,
+  improveEndurance,
+  increaseStrength,
+  improveFlexibility,
+  generalFitness,
+}
+
+extension FitnessGoalX on FitnessGoal {
+  String get label {
+    switch (this) {
+      case FitnessGoal.buildMuscle:
+        return 'Build Muscle';
+      case FitnessGoal.loseWeight:
+        return 'Lose Weight';
+      case FitnessGoal.improveEndurance:
+        return 'Improve Endurance';
+      case FitnessGoal.increaseStrength:
+        return 'Increase Strength';
+      case FitnessGoal.improveFlexibility:
+        return 'Improve Flexibility';
+      case FitnessGoal.generalFitness:
+        return 'General Fitness';
+    }
+  }
+
+  String get emoji {
+    switch (this) {
+      case FitnessGoal.buildMuscle:
+        return '💪';
+      case FitnessGoal.loseWeight:
+        return '🔥';
+      case FitnessGoal.improveEndurance:
+        return '🏃';
+      case FitnessGoal.increaseStrength:
+        return '🏋️';
+      case FitnessGoal.improveFlexibility:
+        return '🧘';
+      case FitnessGoal.generalFitness:
+        return '⭐';
+    }
+  }
+}
+
 // ─── Enum helpers ─────────────────────────────────────────────────────────────
 
 extension WorkoutTypeX on WorkoutType {
@@ -415,6 +460,7 @@ class UserProfile {
   List<InjuryArea> injuries;
   FitnessLevel fitnessLevel;
   List<MuscleGroup> focusAreas;
+  List<FitnessGoal> goals;
   bool preferKg;
   bool preferGym;
 
@@ -424,6 +470,7 @@ class UserProfile {
     this.injuries = const [],
     this.fitnessLevel = FitnessLevel.intermediate,
     this.focusAreas = const [],
+    this.goals = const [],
     this.preferKg = true,
     this.preferGym = true,
   });
@@ -453,6 +500,15 @@ class UserProfile {
                 ),
               )
               .toList(),
+      goals =
+          (j['goals'] as List? ?? [])
+              .map(
+                (e) => FitnessGoal.values.firstWhere(
+                  (g) => g.name == e,
+                  orElse: () => FitnessGoal.generalFitness,
+                ),
+              )
+              .toList(),
       preferKg = j['preferKg'] as bool? ?? true,
       preferGym = j['preferGym'] as bool? ?? true;
 
@@ -462,6 +518,7 @@ class UserProfile {
     'injuries': injuries.map((e) => e.name).toList(),
     'fitnessLevel': fitnessLevel.name,
     'focusAreas': focusAreas.map((e) => e.name).toList(),
+    'goals': goals.map((e) => e.name).toList(),
     'preferKg': preferKg,
     'preferGym': preferGym,
   };
@@ -476,6 +533,7 @@ class AppData {
   StreakData streak;
   List<PersonalRecord> personalRecords;
   DateTime? lastExported;
+  bool hasCompletedOnboarding;
 
   AppData({
     UserProfile? profile,
@@ -484,6 +542,7 @@ class AppData {
     StreakData? streak,
     List<PersonalRecord>? personalRecords,
     this.lastExported,
+    this.hasCompletedOnboarding = false,
   }) : profile = profile ?? UserProfile(),
        workouts = workouts ?? [],
        weightHistory = weightHistory ?? [],
@@ -506,7 +565,8 @@ class AppData {
               .map((e) => PersonalRecord.fromJson(e))
               .toList(),
       lastExported =
-          j['lastExported'] != null ? DateTime.parse(j['lastExported'] as String) : null;
+          j['lastExported'] != null ? DateTime.parse(j['lastExported'] as String) : null,
+      hasCompletedOnboarding = j['hasCompletedOnboarding'] as bool? ?? false;
 
   Map<String, dynamic> toJson() => {
     'profile': profile.toJson(),
@@ -515,6 +575,7 @@ class AppData {
     'streak': streak.toJson(),
     'personalRecords': personalRecords.map((e) => e.toJson()).toList(),
     'lastExported': lastExported?.toIso8601String(),
+    'hasCompletedOnboarding': hasCompletedOnboarding,
     '_exportedAt': DateTime.now().toIso8601String(),
     '_version': '1.0.0',
   };

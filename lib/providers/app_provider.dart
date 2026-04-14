@@ -13,6 +13,7 @@ class AppProvider extends ChangeNotifier {
   ActiveWorkout? get activeWorkout => _activeWorkout;
   bool get isLoading => _isLoading;
   bool get hasActiveWorkout => _activeWorkout != null;
+  bool get hasCompletedOnboarding => _data.hasCompletedOnboarding;
 
   // ─── Init ──────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,24 @@ class AppProvider extends ChangeNotifier {
 
   Future<void> updateProfile(UserProfile profile) async {
     _data.profile = profile;
+    await _save();
+    notifyListeners();
+  }
+
+  /// Called at the end of onboarding. Saves profile, optional first weight
+  /// entry, and marks onboarding complete in one atomic save.
+  Future<void> completeOnboarding({
+    required UserProfile profile,
+    double? initialWeightKg,
+  }) async {
+    _data.profile = profile;
+    if (initialWeightKg != null && initialWeightKg > 0) {
+      _data.weightHistory.add(BodyWeightEntry(
+        date: DateTime.now(),
+        weightKg: initialWeightKg,
+      ));
+    }
+    _data.hasCompletedOnboarding = true;
     await _save();
     notifyListeners();
   }

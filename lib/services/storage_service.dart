@@ -2,14 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:share_plus/share_plus.dart';
 import '../models/models.dart';
 
 class StorageService {
   static const String _fileName = 'technogm_data.json';
+  static const String _prefKey = 'technogm_data';
 
-  // ─── Local file path ───────────────────────────────────────────────────────
+  // ─── Local file path (native platforms) ────────────────────────────────────
 
   Future<File> _getFile() async {
     final dir = await getApplicationDocumentsDirectory();
@@ -20,9 +22,17 @@ class StorageService {
 
   Future<AppData> load() async {
     try {
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        final jsonStr = prefs.getString(_prefKey);
+        if (jsonStr == null) return AppData();
+        return AppData.fromJson(jsonDecode(jsonStr) as Map<String, dynamic>);
+      }
+
       final file = await _getFile();
       if (!await file.exists()) return AppData();
-      final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final json =
+          jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       return AppData.fromJson(json);
     } catch (e) {
       debugPrint('StorageService.load error: $e');
@@ -34,8 +44,14 @@ class StorageService {
 
   Future<void> save(AppData data) async {
     try {
+      final jsonStr = jsonEncode(data.toJson());
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_prefKey, jsonStr);
+        return;
+      }
       final file = await _getFile();
-      await file.writeAsString(jsonEncode(data.toJson()));
+      await file.writeAsString(jsonStr);
     } catch (e) {
       debugPrint('StorageService.save error: $e');
     }
@@ -46,10 +62,11 @@ class StorageService {
   Future<bool> export(AppData data) async {
     try {
       data.lastExported = DateTime.now();
-      final jsonStr = const JsonEncoder.withIndent('  ').convert(data.toJson());
+      final jsonStr =
+          const JsonEncoder.withIndent('  ').convert(data.toJson());
 
       if (kIsWeb) {
-        // Web: not fully supported but fallback
+        // Web: not fully supported
         return false;
       }
 
@@ -60,7 +77,8 @@ class StorageService {
       final result = await Share.shareXFiles(
         [XFile(exportFile.path, mimeType: 'application/json')],
         subject: 'TechnoGM Workout Data Backup',
-        text: 'My TechnoGM workout data — save this to Google Drive or OneDrive to restore later.',
+        text:
+            'My TechnoGM workout data — save this to Google Drive or OneDrive to restore later.',
       );
 
       return result.status == ShareResultStatus.success ||
@@ -86,7 +104,6 @@ class StorageService {
       String content;
 
       if (result.files.single.bytes != null) {
-        // Web or direct bytes
         content = utf8.decode(result.files.single.bytes!);
       } else if (result.files.single.path != null) {
         content = await File(result.files.single.path!).readAsString();
@@ -106,6 +123,11 @@ class StorageService {
 
   Future<void> clearAll() async {
     try {
+      if (kIsWeb) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove(_prefKey);
+        return;
+      }
       final file = await _getFile();
       if (await file.exists()) await file.delete();
     } catch (e) {

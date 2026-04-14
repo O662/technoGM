@@ -6,9 +6,10 @@ import 'providers/app_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/workout_hub_screen.dart';
-import 'screens/history_screen.dart';
+import 'screens/exercises_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/onboarding_welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,7 +41,31 @@ class TechnoGMApp extends StatelessWidget {
       title: 'TechnoGM',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
-      home: const _RootShell(),
+      home: Consumer<AppProvider>(
+        builder: (context, provider, _) {
+          if (provider.isLoading) {
+            return const _SplashScreen();
+          }
+          if (!provider.hasCompletedOnboarding) {
+            return const OnboardingWelcomeScreen();
+          }
+          return const _RootShell();
+        },
+      ),
+    );
+  }
+}
+
+class _SplashScreen extends StatelessWidget {
+  const _SplashScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: TechnoColors.bgPrimary,
+      body: Center(
+        child: CircularProgressIndicator(color: TechnoColors.neonCyan),
+      ),
     );
   }
 }
@@ -58,7 +83,7 @@ class _RootShellState extends State<_RootShell> {
   static const _screens = [
     HomeScreen(),
     WorkoutHubScreen(),
-    HistoryScreen(),
+    ExercisesScreen(),
     StatsScreen(),
     ProfileScreen(),
   ];
@@ -99,9 +124,9 @@ class _NavBar extends StatelessWidget {
           label: 'WORKOUT',
         ),
         NavigationDestination(
-          icon: Icon(Icons.list_alt_outlined),
-          selectedIcon: Icon(Icons.list_alt),
-          label: 'WORKOUTS',
+          icon: Icon(Icons.menu_book_outlined),
+          selectedIcon: Icon(Icons.menu_book),
+          label: 'EXERCISES',
         ),
         NavigationDestination(
           icon: Icon(Icons.bar_chart_outlined),

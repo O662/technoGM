@@ -115,12 +115,12 @@ class _OverviewTab extends StatelessWidget {
         ],
 
         // ── Body Weight ─────────────────────────────────────────────────
-        if (data.weightHistory.length > 1) ...[
+        if (data.weightHistory.isNotEmpty) ...[
           _SectionLabel(label: 'BODY WEIGHT'),
           const SizedBox(height: 8),
           NeonCard(
             child: SizedBox(
-              height: 180,
+              height: 260,
               child: _WeightLineChart(
                 history: data.weightHistory,
                 preferKg: weightInKg,
@@ -510,84 +510,241 @@ class _WeightLineChart extends StatelessWidget {
 
   const _WeightLineChart({required this.history, required this.preferKg});
 
+  double _convert(double kg) => preferKg ? kg : kg * 2.20462;
+  String get _unit => preferKg ? 'kg' : 'lbs';
+
+  /// Linear regression → (slope, intercept)
+  (double, double) _regression(List<FlSpot> spots) {
+    final n = spots.length.toDouble();
+    final sumX = spots.fold(0.0, (s, p) => s + p.x);
+    final sumY = spots.fold(0.0, (s, p) => s + p.y);
+    final sumXY = spots.fold(0.0, (s, p) => s + p.x * p.y);
+    final sumX2 = spots.fold(0.0, (s, p) => s + p.x * p.x);
+    final denom = n * sumX2 - sumX * sumX;
+    if (denom == 0) return (0, sumY / n);
+    final slope = (n * sumXY - sumX * sumY) / denom;
+    final intercept = (sumY - slope * sumX) / n;
+    return (slope, intercept);
+  }
+
   @override
   Widget build(BuildContext context) {
     final spots = history.asMap().entries.map((e) {
-      final kg = e.value.weightKg;
-      final display = preferKg ? kg : kg * 2.20462;
-      return FlSpot(e.key.toDouble(), display);
+      return FlSpot(e.key.toDouble(), _convert(e.value.weightKg));
     }).toList();
 
-    final minY =
-        spots.map((s) => s.y).reduce((a, b) => a < b ? a : b) - 2.0;
-    final maxY =
-        spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) + 2.0;
+    final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b) - 2.0;
+    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) + 2.0;
 
-    return LineChart(
-      LineChartData(
-        minY: minY,
-        maxY: maxY,
-        gridData: FlGridData(
-          show: true,
-          getDrawingHorizontalLine: (_) => FlLine(
-            color: TechnoColors.cardBorder,
-            strokeWidth: 1,
-          ),
-          drawVerticalLine: false,
-        ),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          leftTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 36,
-              getTitlesWidget: (v, _) => Text(
-                v.toStringAsFixed(1),
-                style: GoogleFonts.orbitron(
-                    color: TechnoColors.textMuted, fontSize: 8),
-              ),
-            ),
-          ),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (v, _) {
-                final idx = v.toInt();
-                if (idx >= history.length) return const SizedBox.shrink();
-                return Text(
-                  DateFormat('d/M').format(history[idx].date),
-                  style: GoogleFonts.orbitron(
-                      color: TechnoColors.textMuted, fontSize: 8),
-                );
-              },
-            ),
-          ),
-          topTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-              const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-        ),
-        lineBarsData: [
-          LineChartBarData(
-            spots: spots,
-            isCurved: true,
+    final first = _convert(history.first.weightKg);
+    final current = _convert(history.last.weightKg);
+    final delta = current - first;
+    final deltaColor = delta <= 0 ? TechnoColors.neonGreen : TechnoColors.neonOrange;
+
+    // Trend line
+    final lineBars = <LineChartBarData>[
+      LineChartBarData(
+        spots: spots,
+        isCurved: true,
+        curveSmoothness: 0.35,
+        color: TechnoColors.neonGreen,
+        barWidth: 2.5,
+        dotData: FlDotData(
+          show: spots.length <= 12,
+          getDotPainter: (_, _, _, _) => FlDotCirclePainter(
+            radius: 3,
             color: TechnoColors.neonGreen,
-            barWidth: 2.5,
-            dotData: FlDotData(
-              show: true,
-              getDotPainter: (_, _, _, _) => FlDotCirclePainter(
-                radius: 3,
-                color: TechnoColors.neonGreen,
-                strokeWidth: 0,
-              ),
+            strokeWidth: 0,
+          ),
+        ),
+        belowBarData: BarAreaData(
+          show: true,
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              TechnoColors.neonGreen.withValues(alpha: 0.15),
+              TechnoColors.neonGreen.withValues(alpha: 0.0),
+            ],
+          ),
+        ),
+      ),
+    ];
+
+    if (spots.length >= 2) {
+      final (slope, intercept) = _regression(spots);
+      lineBars.add(
+        LineChartBarData(
+          spots: [
+            FlSpot(spots.first.x, slope * spots.first.x + intercept),
+            FlSpot(spots.last.x, slope * spots.last.x + intercept),
+          ],
+          isCurved: false,
+          color: TechnoColors.neonCyan.withValues(alpha: 0.55),
+          barWidth: 1.5,
+          dotData: const FlDotData(show: false),
+          dashArray: [6, 4],
+        ),
+      );
+    }
+
+    // Spread bottom labels so they never overlap
+    final labelStep = ((spots.length - 1) / 4).ceil().clamp(1, spots.length);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 12, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Stats row ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.only(left: 34, bottom: 10),
+            child: Row(
+              children: [
+                _WeightStatLabel(
+                  label: 'START',
+                  value: '${first.toStringAsFixed(1)} $_unit',
+                  color: TechnoColors.textMuted,
+                ),
+                const SizedBox(width: 16),
+                _WeightStatLabel(
+                  label: 'NOW',
+                  value: '${current.toStringAsFixed(1)} $_unit',
+                  color: TechnoColors.neonGreen,
+                ),
+                const Spacer(),
+                _WeightStatLabel(
+                  label: 'CHANGE',
+                  value: '${delta >= 0 ? '+' : ''}${delta.toStringAsFixed(1)} $_unit',
+                  color: deltaColor,
+                  alignEnd: true,
+                ),
+              ],
             ),
-            belowBarData: BarAreaData(
-              show: true,
-              color: TechnoColors.neonGreen.withValues(alpha: 0.08),
+          ),
+
+          // ── Chart ──────────────────────────────────────────────────────
+          Expanded(
+            child: LineChart(
+              LineChartData(
+                minY: minY,
+                maxY: maxY,
+                gridData: FlGridData(
+                  show: true,
+                  getDrawingHorizontalLine: (_) => FlLine(
+                    color: TechnoColors.cardBorder,
+                    strokeWidth: 1,
+                  ),
+                  drawVerticalLine: false,
+                ),
+                borderData: FlBorderData(show: false),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 38,
+                      getTitlesWidget: (v, _) => Text(
+                        v.toStringAsFixed(1),
+                        style: GoogleFonts.orbitron(
+                            color: TechnoColors.textMuted, fontSize: 8),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (v, _) {
+                        final idx = v.toInt();
+                        if (idx >= history.length) return const SizedBox.shrink();
+                        final isFirst = idx == 0;
+                        final isLast = idx == history.length - 1;
+                        if (!isFirst && !isLast && idx % labelStep != 0) {
+                          return const SizedBox.shrink();
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            DateFormat('d/M').format(history[idx].date),
+                            style: GoogleFonts.orbitron(
+                                color: TechnoColors.textMuted, fontSize: 8),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                ),
+                lineBarsData: lineBars,
+                lineTouchData: LineTouchData(
+                  touchTooltipData: LineTouchTooltipData(
+                    getTooltipItems: (touched) => touched.map((s) {
+                      if (s.barIndex != 0) return null; // skip trend line
+                      final idx = s.spotIndex;
+                      if (idx >= history.length) return null;
+                      final date =
+                          DateFormat('d MMM').format(history[idx].date);
+                      return LineTooltipItem(
+                        '${s.y.toStringAsFixed(1)} $_unit\n',
+                        GoogleFonts.orbitron(
+                          color: TechnoColors.neonGreen,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: date,
+                            style: GoogleFonts.rajdhani(
+                              color: TechnoColors.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WeightStatLabel extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  final bool alignEnd;
+
+  const _WeightStatLabel({
+    required this.label,
+    required this.value,
+    required this.color,
+    this.alignEnd = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+          alignEnd ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.orbitron(
+              color: TechnoColors.textMuted, fontSize: 8, letterSpacing: 1),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.orbitron(
+              color: color, fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+      ],
     );
   }
 }

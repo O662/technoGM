@@ -37,6 +37,19 @@ enum EquipmentType {
 
 enum InjuryArea { shoulder, lowerBack, knee, wrist, hip, ankle, elbow, neck }
 
+enum InjurySide { left, right }
+
+extension InjurySideX on InjurySide {
+  String get label {
+    switch (this) {
+      case InjurySide.left:
+        return 'Left';
+      case InjurySide.right:
+        return 'Right';
+    }
+  }
+}
+
 enum FitnessGoal {
   buildMuscle,
   loseWeight,
@@ -463,6 +476,9 @@ class UserProfile {
   List<FitnessGoal> goals;
   bool preferKg;
   bool preferGym;
+  List<EquipmentType> homeEquipment;
+  Map<InjuryArea, List<InjurySide>> injurySides;
+  double? goalWeightKg;
 
   UserProfile({
     this.name = '',
@@ -473,6 +489,9 @@ class UserProfile {
     this.goals = const [],
     this.preferKg = true,
     this.preferGym = true,
+    this.homeEquipment = const [],
+    this.injurySides = const {},
+    this.goalWeightKg,
   });
 
   UserProfile.fromJson(Map<String, dynamic> j)
@@ -510,7 +529,31 @@ class UserProfile {
               )
               .toList(),
       preferKg = j['preferKg'] as bool? ?? true,
-      preferGym = j['preferGym'] as bool? ?? true;
+      preferGym = j['preferGym'] as bool? ?? true,
+      homeEquipment =
+          (j['homeEquipment'] as List? ?? [])
+              .map(
+                (e) => EquipmentType.values.firstWhere(
+                  (eq) => eq.name == e,
+                  orElse: () => EquipmentType.none,
+                ),
+              )
+              .toList(),
+      injurySides = (j['injurySides'] as Map<String, dynamic>? ?? {}).map(
+        (k, v) => MapEntry(
+          InjuryArea.values.firstWhere(
+            (a) => a.name == k,
+            orElse: () => InjuryArea.shoulder,
+          ),
+          (v as List)
+              .map((s) => InjurySide.values.firstWhere(
+                    (side) => side.name == s,
+                    orElse: () => InjurySide.left,
+                  ))
+              .toList(),
+        ),
+      ),
+      goalWeightKg = (j['goalWeightKg'] as num?)?.toDouble();
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -521,6 +564,11 @@ class UserProfile {
     'goals': goals.map((e) => e.name).toList(),
     'preferKg': preferKg,
     'preferGym': preferGym,
+    'homeEquipment': homeEquipment.map((e) => e.name).toList(),
+    'injurySides': injurySides.map(
+      (k, v) => MapEntry(k.name, v.map((s) => s.name).toList()),
+    ),
+    'goalWeightKg': goalWeightKg,
   };
 }
 

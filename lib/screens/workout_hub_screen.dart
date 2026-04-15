@@ -8,60 +8,108 @@ import '../widgets/neon_button.dart';
 import '../widgets/neon_card.dart';
 import 'active_workout_screen.dart';
 import 'generate_workout_screen.dart';
+import 'muscle_map_tab.dart';
 
-class WorkoutHubScreen extends StatelessWidget {
+class WorkoutHubScreen extends StatefulWidget {
   const WorkoutHubScreen({super.key});
+
+  @override
+  State<WorkoutHubScreen> createState() => _WorkoutHubScreenState();
+}
+
+class _WorkoutHubScreenState extends State<WorkoutHubScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('WORKOUTS')),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Active workout banner ──────────────────────────────────────
-            if (provider.hasActiveWorkout) ...[
-              _ActiveWorkoutBanner(provider: provider),
-              const SizedBox(height: 16),
-            ],
-
-            // ── Generate button ────────────────────────────────────────────
-            NeonButton(
-              label: 'GENERATE WORKOUT',
-              icon: Icons.bolt,
-              color: TechnoColors.neonCyan,
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const GenerateWorkoutScreen()),
-              ),
-            ),
-            const SizedBox(height: 10),
-            NeonButton(
-              label: 'START BLANK WORKOUT',
-              icon: Icons.play_arrow,
-              color: TechnoColors.neonPurple,
-              outlined: true,
-              onTap: () => _startBlank(context, provider),
-            ),
-            const SizedBox(height: 24),
-
-            // ── Quick workouts ─────────────────────────────────────────────
-            Text(
-              'WORKOUT TYPES',
-              style: GoogleFonts.orbitron(
-                color: TechnoColors.textSecondary,
-                fontSize: 11,
-                letterSpacing: 2,
-              ),
-            ),
-            const SizedBox(height: 10),
-            ..._workoutTypes(context, provider),
+      appBar: AppBar(
+        title: const Text('WORKOUTS'),
+        bottom: TabBar(
+          controller: _tabs,
+          indicatorColor: TechnoColors.neonCyan,
+          indicatorWeight: 2,
+          labelColor: TechnoColors.neonCyan,
+          unselectedLabelColor: TechnoColors.textMuted,
+          labelStyle: GoogleFonts.orbitron(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 2,
+          ),
+          unselectedLabelStyle: GoogleFonts.orbitron(
+            fontSize: 10,
+            letterSpacing: 2,
+          ),
+          tabs: const [
+            Tab(text: 'WORKOUTS'),
+            Tab(text: 'MUSCLES'),
           ],
         ),
+      ),
+      body: TabBarView(
+        controller: _tabs,
+        children: [
+          // ── Tab 1: Workout hub content ───────────────────────────────────
+          SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (provider.hasActiveWorkout) ...[
+                  _ActiveWorkoutBanner(provider: provider),
+                  const SizedBox(height: 16),
+                ],
+                NeonButton(
+                  label: 'GENERATE WORKOUT',
+                  icon: Icons.bolt,
+                  color: TechnoColors.neonCyan,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const GenerateWorkoutScreen()),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                NeonButton(
+                  label: 'START BLANK WORKOUT',
+                  icon: Icons.play_arrow,
+                  color: TechnoColors.neonPurple,
+                  outlined: true,
+                  onTap: () => _startBlank(context, provider),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'WORKOUT TYPES',
+                  style: GoogleFonts.orbitron(
+                    color: TechnoColors.textSecondary,
+                    fontSize: 11,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ..._workoutTypes(context, provider),
+              ],
+            ),
+          ),
+
+          // ── Tab 2: Muscle map ────────────────────────────────────────────
+          const MuscleMapTab(),
+        ],
       ),
     );
   }

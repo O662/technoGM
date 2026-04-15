@@ -120,10 +120,11 @@ class _OverviewTab extends StatelessWidget {
           const SizedBox(height: 8),
           NeonCard(
             child: SizedBox(
-              height: 260,
+              height: data.profile.goalWeightKg != null ? 300 : 260,
               child: _WeightLineChart(
                 history: data.weightHistory,
                 preferKg: weightInKg,
+                goalWeightKg: data.profile.goalWeightKg,
               ),
             ),
           ),
@@ -507,8 +508,13 @@ class _WeeklyBarChart extends StatelessWidget {
 class _WeightLineChart extends StatelessWidget {
   final List<BodyWeightEntry> history;
   final bool preferKg;
+  final double? goalWeightKg; // stored in kg, converted on display
 
-  const _WeightLineChart({required this.history, required this.preferKg});
+  const _WeightLineChart({
+    required this.history,
+    required this.preferKg,
+    this.goalWeightKg,
+  });
 
   double _convert(double kg) => preferKg ? kg : kg * 2.20462;
   String get _unit => preferKg ? 'kg' : 'lbs';
@@ -527,19 +533,56 @@ class _WeightLineChart extends StatelessWidget {
     return (slope, intercept);
   }
 
+  /// Human-readable duration from days.
+  String _formatDays(int days) {
+    if (days < 7) return '$days d';
+    if (days < 30) return '${(days / 7).round()} wks';
+    if (days < 365) return '${(days / 30.4).round()} mo';
+    return '${(days / 365.0).toStringAsFixed(1)} yr';
+  }
+
   @override
   Widget build(BuildContext context) {
     final spots = history.asMap().entries.map((e) {
       return FlSpot(e.key.toDouble(), _convert(e.value.weightKg));
     }).toList();
 
-    final minY = spots.map((s) => s.y).reduce((a, b) => a < b ? a : b) - 2.0;
-    final maxY = spots.map((s) => s.y).reduce((a, b) => a > b ? a : b) + 2.0;
-
     final first = _convert(history.first.weightKg);
     final current = _convert(history.last.weightKg);
     final delta = current - first;
     final deltaColor = delta <= 0 ? TechnoColors.neonGreen : TechnoColors.neonOrange;
+
+    // Include goal in y-range so the line is always visible
+    final goalDisplay = goalWeightKg != null ? _convert(goalWeightKg!) : null;
+    final allY = [...spots.map((s) => s.y), ?goalDisplay];
+    final minY = allY.reduce((a, b) => a < b ? a : b) - 2.0;
+    final maxY = allY.reduce((a, b) => a > b ? a : b) + 2.0;
+
+    // Regression & ETA
+    double slope = 0, intercept = 0;
+    if (spots.length >= 2) {
+      (slope, intercept) = _regression(spots);
+    }
+
+    String? etaText;
+    double? remaining;
+    if (goalDisplay != null && spots.length >= 2) {
+      remaining = goalDisplay - current;
+      final totalDays =
+          history.last.date.difference(history.first.date).inDays;
+      if (totalDays > 0) {
+        final slopePerDay = slope * (history.length - 1) / totalDays;
+        if (slopePerDay.abs() >= 0.001) {
+          // trend moving toward goal?
+          if ((remaining < 0 && slopePerDay < 0) ||
+              (remaining > 0 && slopePerDay > 0)) {
+            etaText = _formatDays((remaining / slopePerDay).abs().round());
+          } else {
+            etaText = 'off track';
+          }
+        }
+      }
+    }
 
     // Trend line
     final lineBars = <LineChartBarData>[
@@ -572,7 +615,6 @@ class _WeightLineChart extends StatelessWidget {
     ];
 
     if (spots.length >= 2) {
-      final (slope, intercept) = _regression(spots);
       lineBars.add(
         LineChartBarData(
           spots: [
@@ -598,7 +640,7 @@ class _WeightLineChart extends StatelessWidget {
         children: [
           // ── Stats row ──────────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.only(left: 34, bottom: 10),
+            padding: const EdgeInsets.only(left: 34, bottom: 6),
             child: Row(
               children: [
                 _WeightStatLabel(
@@ -623,12 +665,65 @@ class _WeightLineChart extends StatelessWidget {
             ),
           ),
 
+          // ── Goal row (only when a goal weight is set) ──────────────────
+          if (goalDisplay != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 34, bottom: 8),
+              child: Row(
+                children: [
+                  _WeightStatLabel(
+                    label: 'GOAL',
+                    value: '${goalDisplay.toStringAsFixed(1)} $_unit',
+                    color: TechnoColors.neonYellow,
+                  ),
+                  const SizedBox(width: 16),
+                  if (remaining != null)
+                    _WeightStatLabel(
+                      label: 'TO GO',
+                      value: '${remaining.abs().toStringAsFixed(1)} $_unit',
+                      color: TechnoColors.neonYellow,
+                    ),
+                  const Spacer(),
+                  if (etaText != null)
+                    _WeightStatLabel(
+                      label: 'EST. TIME',
+                      value: etaText,
+                      color: etaText == 'off track'
+                          ? TechnoColors.neonOrange
+                          : TechnoColors.neonCyan,
+                      alignEnd: true,
+                    ),
+                ],
+              ),
+            ),
+
           // ── Chart ──────────────────────────────────────────────────────
           Expanded(
             child: LineChart(
               LineChartData(
                 minY: minY,
                 maxY: maxY,
+                extraLinesData: goalDisplay != null
+                    ? ExtraLinesData(horizontalLines: [
+                        HorizontalLine(
+                          y: goalDisplay,
+                          color: TechnoColors.neonYellow.withValues(alpha: 0.8),
+                          strokeWidth: 1.5,
+                          dashArray: [6, 4],
+                          label: HorizontalLineLabel(
+                            show: true,
+                            alignment: Alignment.topRight,
+                            padding: const EdgeInsets.only(right: 4, bottom: 2),
+                            style: GoogleFonts.orbitron(
+                              color: TechnoColors.neonYellow,
+                              fontSize: 8,
+                              letterSpacing: 1,
+                            ),
+                            labelResolver: (_) => 'GOAL',
+                          ),
+                        ),
+                      ])
+                    : ExtraLinesData(),
                 gridData: FlGridData(
                   show: true,
                   getDrawingHorizontalLine: (_) => FlLine(

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/app_provider.dart';
+import 'providers/step_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/workout_hub_screen.dart';
@@ -25,8 +26,11 @@ void main() async {
   await provider.init();
 
   runApp(
-    ChangeNotifierProvider.value(
-      value: provider,
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: provider),
+        ChangeNotifierProvider(create: (_) => StepProvider()),
+      ],
       child: const TechnoGMApp(),
     ),
   );

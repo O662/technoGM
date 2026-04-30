@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
 import '../services/step_service.dart';
 import '../services/storage_service.dart';
+import '../services/home_widget_service.dart';
 
 class AppProvider extends ChangeNotifier {
   final StorageService _storage = StorageService();
@@ -142,6 +144,12 @@ class AppProvider extends ChangeNotifier {
 
     await _save();
     notifyListeners();
+
+    unawaited(HomeWidgetService.updateAll(
+      streak: _data.streak.currentWeekStreak,
+      lastWorkoutName: completed.name,
+    ));
+
     return completed;
   }
 

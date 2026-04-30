@@ -8,7 +8,8 @@ import '../widgets/neon_button.dart';
 import '../widgets/neon_card.dart';
 import 'active_workout_screen.dart';
 import 'generate_workout_screen.dart';
-import 'muscle_map_tab.dart';
+import 'muscle_chart_tab.dart';
+import 'running_plan_screen.dart';
 
 class WorkoutHubScreen extends StatefulWidget {
   const WorkoutHubScreen({super.key});
@@ -219,8 +220,9 @@ class _WorkoutHubScreenState extends State<WorkoutHubScreen>
           // ── Tab 3: Plans ─────────────────────────────────────────────────
           const _PlansTab(),
 
-          // ── Tab 4: Muscle map ────────────────────────────────────────────
-          const MuscleMapTab(),
+          // ── Tab 4: Muscle Chart ───────────────────────────────────────────
+          const MuscleChartTab(),
+
         ],
       ),
     );
@@ -718,9 +720,19 @@ class _PlansTabState extends State<_PlansTab> {
           const SizedBox(height: 10),
           ..._plans.map((plan) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: NeonCard(
-              borderColor: plan.color.withValues(alpha: 0.3),
-              child: Row(
+            child: GestureDetector(
+              onTap: () {
+                if (plan.title == '10-Week Beginner Running Plan') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const RunningPlanScreen()),
+                  );
+                }
+              },
+              child: NeonCard(
+                borderColor: plan.color.withValues(alpha: 0.3),
+                child: Row(
                 children: [
                   Text(plan.emoji, style: const TextStyle(fontSize: 30)),
                   const SizedBox(width: 14),
@@ -750,6 +762,7 @@ class _PlansTabState extends State<_PlansTab> {
                 ],
               ),
             ),
+          ),
           )),
           const SizedBox(height: 32),
         ],

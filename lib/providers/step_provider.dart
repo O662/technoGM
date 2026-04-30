@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../services/step_service.dart';
+import '../services/home_widget_service.dart';
+import '../services/water_service.dart';
 
 enum RingsStatus { idle, loading, granted, denied, unavailable }
 
@@ -85,6 +87,20 @@ class ActivityRingsProvider extends ChangeNotifier {
     _waterMl = results[3] as double?;
     _weeklyStepGoalDays = results[4] as int;
     _lastSynced = DateTime.now();
+
+    unawaited(HomeWidgetService.updateAll(
+      steps: _steps,
+      calories: _caloriesKcal,
+      activeMinutes: _activeMinutes,
+      waterMl: _waterMl,
+    ));
+  }
+
+  Future<void> addWater(double ml) async {
+    final newTotal = await WaterService.addWater(ml);
+    _waterMl = newTotal;
+    notifyListeners();
+    unawaited(HomeWidgetService.updateWaterOnly(newTotal));
   }
 
   static DateTime _weekStart(DateTime d) {

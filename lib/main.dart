@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'providers/app_provider.dart';
 import 'providers/step_provider.dart';
+import 'services/home_widget_service.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/workout_hub_screen.dart';
@@ -22,6 +23,8 @@ void main() async {
     systemNavigationBarColor: TechnoColors.bgSecondary,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
+
+  await HomeWidgetService.init();
 
   final provider = AppProvider();
   await provider.init();

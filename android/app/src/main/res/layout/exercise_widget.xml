@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="10dp"
+    android:gravity="center_horizontal">
+
+    <!-- Label -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="LAST WORKOUT"
+        android:textColor="#8890B5"
+        android:textSize="7sp"
+        android:letterSpacing="0.1" />
+
+    <!-- Last workout name -->
+    <TextView
+        android:id="@+id/last_workout_name"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="READY TO TRAIN?"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:ellipsize="end"
+        android:maxLines="1" />
+
+    <!-- Start button -->
+    <TextView
+        android:id="@+id/btn_start_workout"
+        android:layout_width="match_parent"
+        android:layout_height="26dp"
+        android:background="@drawable/widget_btn_start"
+        android:gravity="center"
+        android:text="START WORKOUT"
+        android:textColor="#00F5FF"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.1"
+        android:clickable="true"
+        android:focusable="true" />
+
+</LinearLayout>

@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:gravity="center_horizontal">
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="HYDRATION"
+        android:textColor="#7B2FFF"
+        android:textSize="9sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.2" />
+
+    <!-- Current amount -->
+    <TextView
+        android:id="@+id/water_amount"
+        android:layout_width="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="0 mL"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <!-- Progress bar -->
+    <ProgressBar
+        android:id="@+id/water_progress"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="5dp"
+        android:progressTint="#7B2FFF"
+        android:progressBackgroundTint="#1A1A2E"
+        android:indeterminate="false"
+        android:max="2000"
+        android:progress="0"
+        android:layout_marginBottom="4dp" />
+
+    <!-- Goal label -->
+    <TextView
+        android:id="@+id/water_goal_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="/ 2,000 mL"
+        android:textColor="#444466"
+        android:textSize="8sp"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Add buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:weightSum="3">
+
+        <TextView
+            android:id="@+id/btn_water_100"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="3dp"
+            android:background="@drawable/widget_btn_water"
+            android:gravity="center"
+            android:text="+100"
+            android:textColor="#7B2FFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/btn_water_250"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="3dp"
+            android:background="@drawable/widget_btn_water"
+            android:gravity="center"
+            android:text="+250"
+            android:textColor="#7B2FFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true" />
+
+        <TextView
+            android:id="@+id/btn_water_500"
+            android:layout_width="0dp"
+            android:layout_height="28dp"
+            android:layout_weight="1"
+            android:layout_marginStart="3dp"
+            android:background="@drawable/widget_btn_water"
+            android:gravity="center"
+            android:text="+500"
+            android:textColor="#7B2FFF"
+            android:textSize="10sp"
+            android:textStyle="bold"
+            android:clickable="true"
+            android:focusable="true" />
+
+    </LinearLayout>
+
+</LinearLayout>

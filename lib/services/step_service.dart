@@ -1,4 +1,5 @@
 import 'package:health/health.dart';
+import 'water_service.dart';
 
 class StepService {
   static final _health = Health();
@@ -124,9 +125,7 @@ class StepService {
     }
   }
 
-  /// Water is tracked in-app only (no Health Connect permission on Android).
-  /// Returns null until app-internal hydration logging is wired up.
-  static Future<double?> todayWaterMl() async => null;
+  static Future<double?> todayWaterMl() async => WaterService.getTodayWater();
 
   static DateTime _todayStart() {
     final n = DateTime.now();

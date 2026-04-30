@@ -1,42 +1,108 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../services/step_service.dart';
 
-enum StepStatus { idle, loading, granted, denied, unavailable }
+enum RingsStatus { idle, loading, granted, denied, unavailable }
 
-/// Holds today's step count fetched from Health Connect.
-///
-/// Call [refresh] once (e.g. in a widget's initState) to trigger the
-/// permission prompt and load data. The widget tree rebuilds via
-/// [ChangeNotifier] whenever the state changes.
-class StepProvider extends ChangeNotifier {
+class ActivityRingsProvider extends ChangeNotifier {
   int? _steps;
-  StepStatus _status = StepStatus.idle;
+  double? _caloriesKcal;
+  int? _activeMinutes;
+  double? _waterMl;
+  int? _weeklyStepGoalDays;
+  RingsStatus _status = RingsStatus.idle;
+  DateTime? _lastSynced;
+  Timer? _timer;
+
+  static const int stepsGoal = 10000;
+  static const double caloriesGoal = 500.0;
+  static const int activeMinutesGoal = 30;
+  static const double waterGoalMl = 2000.0;
+  static const int weeklyStepDaysGoal = 5;
 
   int? get steps => _steps;
-  StepStatus get status => _status;
-  bool get isLoading => _status == StepStatus.loading;
+  double? get caloriesKcal => _caloriesKcal;
+  int? get activeMinutes => _activeMinutes;
+  double? get waterMl => _waterMl;
+  int? get weeklyStepGoalDays => _weeklyStepGoalDays;
+  RingsStatus get status => _status;
+  DateTime? get lastSynced => _lastSynced;
+  bool get isLoading => _status == RingsStatus.loading;
+
+  double get stepsProgress => (_steps ?? 0) / stepsGoal;
+  double get caloriesProgress => (_caloriesKcal ?? 0) / caloriesGoal;
+  double get activeMinutesProgress => (_activeMinutes ?? 0) / activeMinutesGoal;
+  double get waterProgress => (_waterMl ?? 0) / waterGoalMl;
+  double get weeklyStepGoalDaysProgress =>
+      (_weeklyStepGoalDays ?? 0) / weeklyStepDaysGoal;
 
   Future<void> refresh() async {
-    if (_status == StepStatus.loading) return;
-    _status = StepStatus.loading;
+    if (_status == RingsStatus.loading) return;
+    _status = RingsStatus.loading;
     notifyListeners();
 
     final available = await StepService.isAvailable();
     if (!available) {
-      _status = StepStatus.unavailable;
+      _status = RingsStatus.unavailable;
       notifyListeners();
       return;
     }
 
-    final result = await StepService.todaySteps();
-    if (result == null) {
-      _status = StepStatus.denied;
-    } else {
-      _steps = result;
-      _status = StepStatus.granted;
+    final granted = await StepService.requestPermission();
+    if (!granted) {
+      _status = RingsStatus.denied;
+      notifyListeners();
+      return;
     }
+
+    await _loadAll();
+    _status = RingsStatus.granted;
+    notifyListeners();
+  }
+
+  void startAutoRefresh() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 15), (_) => _silentRefresh());
+  }
+
+  void stopAutoRefresh() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  Future<void> _loadAll() async {
+    final weekStart = _weekStart(DateTime.now());
+    final results = await Future.wait([
+      StepService.todaySteps(),
+      StepService.todayActiveCaloriesKcal(),
+      StepService.todayActiveMinutes(),
+      StepService.todayWaterMl(),
+      StepService.weekStepGoalDays(weekStart, stepsGoal),
+    ]);
+    _steps = results[0] as int?;
+    _caloriesKcal = results[1] as double?;
+    _activeMinutes = results[2] as int?;
+    _waterMl = results[3] as double?;
+    _weeklyStepGoalDays = results[4] as int;
+    _lastSynced = DateTime.now();
+  }
+
+  static DateTime _weekStart(DateTime d) {
+    final daysFromMonday = (d.weekday - 1) % 7;
+    return DateTime(d.year, d.month, d.day - daysFromMonday);
+  }
+
+  Future<void> _silentRefresh() async {
+    if (_status != RingsStatus.granted) return;
+    await _loadAll();
     notifyListeners();
   }
 
   Future<void> openInstallPage() => StepService.installHealthConnect();
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 }

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,9 +6,11 @@ import '../providers/app_provider.dart';
 import '../providers/step_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
+import '../widgets/activity_rings_widget.dart';
 import '../models/models.dart';
 import '../services/workout_generator.dart';
 import 'active_workout_screen.dart';
+import 'exercises_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -22,82 +23,122 @@ class HomeScreen extends StatelessWidget {
     final name = data.profile.name.isNotEmpty ? data.profile.name : 'Athlete';
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          // ── Header ────────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: _Header(name: name, streak: streak),
-          ),
+      body: Stack(
+        children: [
+          CustomScrollView(
+            slivers: [
+              // ── Header ──────────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: _Header(name: name),
+              ),
 
-          // ── Hero Animation ─────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: _HeroAnimation(),
-          ),
+              // ── Activity Rings ───────────────────────────────────────────────
+              const SliverToBoxAdapter(
+                child: ActivityRingsWidget(),
+              ),
 
-          // ── Daily Steps ───────────────────────────────────────────────────
-          const SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: _DailyStepsCard(),
-            ),
-          ),
-
-          // ── This Week ─────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-              child: _ThisWeekCard(provider: provider),
-            ),
-          ),
-
-          // ── Quick Start ───────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-              child: Text(
-                'QUICK START',
-                style: GoogleFonts.orbitron(
-                  color: TechnoColors.textSecondary,
-                  fontSize: 11,
-                  letterSpacing: 2,
+              // ── This Week ───────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: _ThisWeekCard(provider: provider),
                 ),
               ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _QuickStartGrid(provider: provider),
-            ),
-          ),
 
-          // ── Recent Workouts ───────────────────────────────────────────────
-          if (data.workouts.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
-                child: Text(
-                  'RECENT',
-                  style: GoogleFonts.orbitron(
-                    color: TechnoColors.textSecondary,
-                    fontSize: 11,
-                    letterSpacing: 2,
+              // ── Jump Right In ────────────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+                  child: Text(
+                    'JUMP RIGHT IN',
+                    style: GoogleFonts.orbitron(
+                      color: TechnoColors.textSecondary,
+                      fontSize: 11,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
               ),
-            ),
-            SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (ctx, i) => Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: _RecentWorkoutTile(workout: data.workouts[i]),
-                ),
-                childCount: data.workouts.length.clamp(0, 3),
+              SliverToBoxAdapter(
+                child: _JumpRightInRow(provider: provider),
               ),
-            ),
-          ],
 
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              // ── Quick Start (Cardio) ─────────────────────────────────────────
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: Text(
+                    'QUICK START',
+                    style: GoogleFonts.orbitron(
+                      color: TechnoColors.textSecondary,
+                      fontSize: 11,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: _CardioRow(provider: provider),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ExercisesScreen()),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: TechnoColors.neonCyan.withValues(alpha: 0.5)),
+                      foregroundColor: TechnoColors.neonCyan,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'BROWSE ALL EXERCISES',
+                      style: GoogleFonts.orbitron(fontSize: 11, letterSpacing: 2),
+                    ),
+                  ),
+                ),
+              ),
+
+              // ── Recent Workouts ──────────────────────────────────────────────
+              if (data.workouts.isNotEmpty) ...[
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
+                    child: Text(
+                      'RECENT',
+                      style: GoogleFonts.orbitron(
+                        color: TechnoColors.textSecondary,
+                        fontSize: 11,
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ),
+                ),
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: _RecentWorkoutTile(workout: data.workouts[i]),
+                    ),
+                    childCount: data.workouts.length.clamp(0, 3),
+                  ),
+                ),
+              ],
+
+              const SliverToBoxAdapter(child: SizedBox(height: 140)),
+            ],
+          ),
+
+          // ── Streak (floating, top-right) ─────────────────────────────────────
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 8,
+            right: 16,
+            child: _FlameIcon(streak: streak),
+          ),
         ],
       ),
     );
@@ -108,8 +149,7 @@ class HomeScreen extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   final String name;
-  final StreakData streak;
-  const _Header({required this.name, required this.streak});
+  const _Header({required this.name});
 
   @override
   Widget build(BuildContext context) {
@@ -181,37 +221,28 @@ class _Header extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                greeting,
-                style: GoogleFonts.orbitron(
-                  color: TechnoColors.neonCyan,
-                  fontSize: 11,
-                  letterSpacing: 3,
-                  fontWeight: FontWeight.w600,
-                  height: 1.0,
-                ),
-              ),
-              const Spacer(),
-              _FlameIcon(streak: streak),
-            ],
-          ),
-          Transform.translate(
-            offset: const Offset(0, -8),
-            child: Text(
-              name.toUpperCase(),
-              style: GoogleFonts.orbitron(
-                color: TechnoColors.textPrimary,
-                fontSize: 28,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 2,
-                height: 1.0,
-              ),
+          Text(
+            greeting,
+            style: GoogleFonts.orbitron(
+              color: TechnoColors.neonCyan,
+              fontSize: 11,
+              letterSpacing: 3,
+              fontWeight: FontWeight.w600,
+              height: 1.0,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 5),
+          Text(
+            name.toUpperCase(),
+            style: GoogleFonts.orbitron(
+              color: TechnoColors.textPrimary,
+              fontSize: 28,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2,
+              height: 1.0,
+            ),
+          ),
+          const SizedBox(height: 5),
           Text(
             DateFormat('EEEE, d MMMM').format(DateTime.now()).toUpperCase(),
             style: GoogleFonts.rajdhani(
@@ -273,480 +304,6 @@ class _FlameIcon extends StatelessWidget {
   }
 }
 
-// ── Hero Animation ────────────────────────────────────────────────────────────
-
-class _HeroAnimation extends StatefulWidget {
-  const _HeroAnimation();
-
-  @override
-  State<_HeroAnimation> createState() => _HeroAnimationState();
-}
-
-class _HeroAnimationState extends State<_HeroAnimation>
-    with TickerProviderStateMixin {
-  late final AnimationController _pulseCtrl;
-  late final AnimationController _rotateCtrl;
-  late final AnimationController _glowCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2400),
-    )..repeat();
-    _rotateCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 9000),
-    )..repeat();
-    _glowCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulseCtrl.dispose();
-    _rotateCtrl.dispose();
-    _glowCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final height = MediaQuery.of(context).size.height / 3;
-    return SizedBox(
-      height: height,
-      width: double.infinity,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_pulseCtrl, _rotateCtrl, _glowCtrl]),
-        builder: (_, __) => CustomPaint(
-          painter: _TechnoPainter(
-            pulse: _pulseCtrl.value,
-            rotation: _rotateCtrl.value,
-            glow: _glowCtrl.value,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _TechnoPainter extends CustomPainter {
-  final double pulse;
-  final double rotation;
-  final double glow;
-
-  const _TechnoPainter({
-    required this.pulse,
-    required this.rotation,
-    required this.glow,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final maxR = math.min(size.width, size.height) * 0.40;
-
-    _drawGrid(canvas, size);
-    _drawPulsingRings(canvas, center, maxR);
-    _drawStaticRings(canvas, center, maxR);
-    _drawRotatingArcs(canvas, center, maxR);
-    _drawOrbitingDots(canvas, center, maxR);
-    _drawCenterGlow(canvas, center, maxR);
-    _drawCornerAccents(canvas, size);
-  }
-
-  void _drawGrid(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = TechnoColors.neonCyan.withValues(alpha: 0.035)
-      ..strokeWidth = 0.5;
-    const spacing = 28.0;
-    for (double x = 0; x < size.width; x += spacing) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += spacing) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
-  }
-
-  void _drawPulsingRings(Canvas canvas, Offset center, double maxR) {
-    for (int i = 0; i < 3; i++) {
-      final t = (pulse + i / 3.0) % 1.0;
-      final radius = maxR * t;
-      final alpha = (1.0 - t) * 0.55;
-      if (alpha <= 0) continue;
-      canvas.drawCircle(
-        center,
-        radius,
-        Paint()
-          ..color = TechnoColors.neonCyan.withValues(alpha: alpha)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
-      );
-    }
-  }
-
-  void _drawStaticRings(Canvas canvas, Offset center, double maxR) {
-    canvas.drawCircle(
-      center,
-      maxR,
-      Paint()
-        ..color = TechnoColors.neonCyan.withValues(alpha: 0.12)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
-    );
-    canvas.drawCircle(
-      center,
-      maxR * 0.6,
-      Paint()
-        ..color = TechnoColors.neonPurple.withValues(alpha: 0.18)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
-    );
-    canvas.drawCircle(
-      center,
-      maxR * 0.25,
-      Paint()
-        ..color = TechnoColors.neonCyan.withValues(alpha: 0.1)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8,
-    );
-  }
-
-  void _drawRotatingArcs(Canvas canvas, Offset center, double maxR) {
-    final angle = rotation * 2 * math.pi;
-
-    // Inner arcs — purple, 4 segments rotating clockwise
-    final innerArcPaint = Paint()
-      ..color = TechnoColors.neonPurple.withValues(alpha: 0.75)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..strokeCap = StrokeCap.round;
-    final innerRect = Rect.fromCircle(center: center, radius: maxR * 0.6);
-    for (int i = 0; i < 4; i++) {
-      canvas.drawArc(
-        innerRect,
-        angle + (i * math.pi / 2),
-        math.pi / 5,
-        false,
-        innerArcPaint,
-      );
-    }
-
-    // Outer arcs — cyan, 3 segments rotating counter-clockwise
-    final outerArcPaint = Paint()
-      ..color = TechnoColors.neonCyan.withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    final outerRect = Rect.fromCircle(center: center, radius: maxR * 0.85);
-    final reverseAngle = -angle * 0.6;
-    for (int i = 0; i < 3; i++) {
-      canvas.drawArc(
-        outerRect,
-        reverseAngle + (i * 2 * math.pi / 3),
-        math.pi / 7,
-        false,
-        outerArcPaint,
-      );
-    }
-  }
-
-  void _drawOrbitingDots(Canvas canvas, Offset center, double maxR) {
-    final angle = rotation * 2 * math.pi;
-    final dotPaint = Paint()
-      ..color = TechnoColors.neonCyan
-      ..style = PaintingStyle.fill;
-    final dimDotPaint = Paint()
-      ..color = TechnoColors.neonPurple.withValues(alpha: 0.8)
-      ..style = PaintingStyle.fill;
-
-    // 4 dots on outer ring
-    for (int i = 0; i < 4; i++) {
-      final a = angle + (i * math.pi / 2);
-      canvas.drawCircle(
-        Offset(center.dx + maxR * math.cos(a), center.dy + maxR * math.sin(a)),
-        2.5,
-        dotPaint,
-      );
-    }
-    // 3 dots on mid ring (counter-rotating)
-    final reverseAngle = -angle * 0.6;
-    for (int i = 0; i < 3; i++) {
-      final a = reverseAngle + (i * 2 * math.pi / 3);
-      canvas.drawCircle(
-        Offset(
-          center.dx + maxR * 0.6 * math.cos(a),
-          center.dy + maxR * 0.6 * math.sin(a),
-        ),
-        2.0,
-        dimDotPaint,
-      );
-    }
-  }
-
-  void _drawCenterGlow(Canvas canvas, Offset center, double maxR) {
-    // Soft glow halo
-    canvas.drawCircle(
-      center,
-      maxR * 0.22,
-      Paint()
-        ..color = TechnoColors.neonCyan.withValues(alpha: 0.08 + glow * 0.12)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 22),
-    );
-    // Tight glow
-    canvas.drawCircle(
-      center,
-      7,
-      Paint()
-        ..color = TechnoColors.neonCyan.withValues(alpha: 0.4 + glow * 0.35)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 7),
-    );
-    // Solid center dot
-    canvas.drawCircle(
-      center,
-      3,
-      Paint()
-        ..color = TechnoColors.neonCyan
-        ..style = PaintingStyle.fill,
-    );
-  }
-
-  void _drawCornerAccents(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = TechnoColors.neonCyan.withValues(alpha: 0.25)
-      ..strokeWidth = 1.2
-      ..style = PaintingStyle.stroke;
-    const len = 14.0;
-    const margin = 10.0;
-
-    // Top-left
-    canvas.drawLine(const Offset(margin, margin), Offset(margin + len, margin), paint);
-    canvas.drawLine(const Offset(margin, margin), Offset(margin, margin + len), paint);
-    // Top-right
-    canvas.drawLine(Offset(size.width - margin, margin), Offset(size.width - margin - len, margin), paint);
-    canvas.drawLine(Offset(size.width - margin, margin), Offset(size.width - margin, margin + len), paint);
-    // Bottom-left
-    canvas.drawLine(Offset(margin, size.height - margin), Offset(margin + len, size.height - margin), paint);
-    canvas.drawLine(Offset(margin, size.height - margin), Offset(margin, size.height - margin - len), paint);
-    // Bottom-right
-    canvas.drawLine(Offset(size.width - margin, size.height - margin), Offset(size.width - margin - len, size.height - margin), paint);
-    canvas.drawLine(Offset(size.width - margin, size.height - margin), Offset(size.width - margin, size.height - margin - len), paint);
-  }
-
-  @override
-  bool shouldRepaint(_TechnoPainter old) => true;
-}
-
-// ── Daily Steps Card ──────────────────────────────────────────────────────────
-
-class _DailyStepsCard extends StatefulWidget {
-  const _DailyStepsCard();
-
-  @override
-  State<_DailyStepsCard> createState() => _DailyStepsCardState();
-}
-
-class _DailyStepsCardState extends State<_DailyStepsCard> {
-  static const _goal = 10000;
-
-  @override
-  void initState() {
-    super.initState();
-    // Kick off the permission prompt + fetch on first build.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StepProvider>().refresh();
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final sp = context.watch<StepProvider>();
-
-    return NeonCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'DAILY STEPS',
-                style: GoogleFonts.orbitron(
-                  color: TechnoColors.textSecondary,
-                  fontSize: 10,
-                  letterSpacing: 2,
-                ),
-              ),
-              const Spacer(),
-              GestureDetector(
-                onTap: sp.isLoading ? null : () => sp.refresh(),
-                child: Icon(
-                  Icons.refresh,
-                  size: 16,
-                  color: sp.isLoading
-                      ? TechnoColors.textMuted
-                      : TechnoColors.neonCyan,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          _buildBody(sp),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBody(StepProvider sp) {
-    switch (sp.status) {
-      case StepStatus.loading:
-      case StepStatus.idle:
-        return const SizedBox(
-          height: 36,
-          child: Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: TechnoColors.neonCyan,
-              ),
-            ),
-          ),
-        );
-
-      case StepStatus.unavailable:
-        return _ActionRow(
-          message: 'Health Connect not installed',
-          buttonLabel: 'INSTALL',
-          onTap: () => sp.openInstallPage(),
-        );
-
-      case StepStatus.denied:
-        return _ActionRow(
-          message: 'Permission required',
-          buttonLabel: 'ALLOW',
-          onTap: () => sp.refresh(),
-        );
-
-      case StepStatus.granted:
-        final steps = sp.steps ?? 0;
-        final progress = (steps / _goal).clamp(0.0, 1.0);
-        final done = steps >= _goal;
-        final color = done ? TechnoColors.neonGreen : TechnoColors.neonCyan;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  NumberFormat('#,###').format(steps),
-                  style: GoogleFonts.orbitron(
-                    color: color,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4, left: 6),
-                  child: Text(
-                    '/ ${NumberFormat('#,###').format(_goal)}',
-                    style: GoogleFonts.rajdhani(
-                      color: color.withValues(alpha: 0.55),
-                      fontSize: 14,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                if (done)
-                  Icon(Icons.check_circle,
-                      color: TechnoColors.neonGreen, size: 20),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: progress,
-                minHeight: 6,
-                backgroundColor: color.withValues(alpha: 0.15),
-                valueColor: AlwaysStoppedAnimation<Color>(color),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              done
-                  ? 'GOAL REACHED!'
-                  : '${NumberFormat('#,###').format(_goal - steps)} TO GO',
-              style: GoogleFonts.rajdhani(
-                color: done ? TechnoColors.neonGreen : TechnoColors.textMuted,
-                fontSize: 11,
-                letterSpacing: 1,
-              ),
-            ),
-          ],
-        );
-    }
-  }
-}
-
-class _ActionRow extends StatelessWidget {
-  final String message;
-  final String buttonLabel;
-  final VoidCallback onTap;
-
-  const _ActionRow({
-    required this.message,
-    required this.buttonLabel,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(Icons.directions_walk,
-            color: TechnoColors.textMuted, size: 18),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            message,
-            style: GoogleFonts.rajdhani(
-              color: TechnoColors.textMuted,
-              fontSize: 13,
-            ),
-          ),
-        ),
-        GestureDetector(
-          onTap: onTap,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              color: TechnoColors.neonCyan.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: TechnoColors.neonCyan.withValues(alpha: 0.5)),
-            ),
-            child: Text(
-              buttonLabel,
-              style: GoogleFonts.orbitron(
-                color: TechnoColors.neonCyan,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 // ── This Week Card ────────────────────────────────────────────────────────────
 
 class _ThisWeekCard extends StatelessWidget {
@@ -759,6 +316,9 @@ class _ThisWeekCard extends StatelessWidget {
     final minutes = provider.thisWeekMinutes;
     final sessionGoal = provider.data.streak.weeklySessionGoal;
     final minuteGoal = provider.data.streak.weeklyMinutesGoal;
+    final stepDaysGoal = provider.data.streak.weeklyStepDaysGoal;
+    final sp = context.watch<ActivityRingsProvider>();
+    final stepDays = sp.weeklyStepGoalDays ?? 0;
 
     return NeonCard(
       child: Column(
@@ -782,13 +342,21 @@ class _ThisWeekCard extends StatelessWidget {
                 color: TechnoColors.neonCyan,
                 done: sessions >= sessionGoal,
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               _StatPill(
                 value: '$minutes',
                 label: 'MINUTES',
                 target: '$minuteGoal',
                 color: TechnoColors.neonPurple,
                 done: minutes >= minuteGoal,
+              ),
+              const SizedBox(width: 8),
+              _StatPill(
+                value: '$stepDays',
+                label: 'STEP DAYS',
+                target: '$stepDaysGoal',
+                color: TechnoColors.neonGreen,
+                done: stepDays >= stepDaysGoal,
               ),
             ],
           ),
@@ -864,11 +432,12 @@ class _StatPill extends StatelessWidget {
   }
 }
 
-// ── Quick Start Grid ──────────────────────────────────────────────────────────
 
-class _QuickStartGrid extends StatelessWidget {
+// ── Jump Right In Row ─────────────────────────────────────────────────────────
+
+class _JumpRightInRow extends StatelessWidget {
   final AppProvider provider;
-  const _QuickStartGrid({required this.provider});
+  const _JumpRightInRow({required this.provider});
 
   @override
   Widget build(BuildContext context) {
@@ -906,19 +475,72 @@ class _QuickStartGrid extends StatelessWidget {
       ),
     ];
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 10,
-        mainAxisSpacing: 10,
-        childAspectRatio: 1.6,
+    return SizedBox(
+      height: 90,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: quickStarts.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (ctx, i) => _QuickStartTile(
+          qs: quickStarts[i],
+          provider: provider,
+        ),
       ),
-      itemCount: quickStarts.length,
-      itemBuilder: (ctx, i) => _QuickStartTile(
-        qs: quickStarts[i],
-        provider: provider,
+    );
+  }
+}
+
+// ── Cardio Row ────────────────────────────────────────────────────────────────
+
+class _CardioRow extends StatelessWidget {
+  final AppProvider provider;
+  const _CardioRow({required this.provider});
+
+  @override
+  Widget build(BuildContext context) {
+    final cardioOptions = [
+      _QuickStart(
+        label: 'Walking',
+        icon: Icons.directions_walk,
+        color: TechnoColors.neonGreen,
+        exercises: () => [],
+        type: WorkoutType.cardio,
+      ),
+      _QuickStart(
+        label: 'Running',
+        icon: Icons.directions_run,
+        color: TechnoColors.neonCyan,
+        exercises: () => [],
+        type: WorkoutType.cardio,
+      ),
+      _QuickStart(
+        label: 'Swimming',
+        icon: Icons.pool,
+        color: TechnoColors.neonPurple,
+        exercises: () => [],
+        type: WorkoutType.cardio,
+      ),
+      _QuickStart(
+        label: 'Biking',
+        icon: Icons.directions_bike,
+        color: TechnoColors.neonOrange,
+        exercises: () => [],
+        type: WorkoutType.cardio,
+      ),
+    ];
+
+    return SizedBox(
+      height: 90,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: cardioOptions.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (ctx, i) => _QuickStartTile(
+          qs: cardioOptions[i],
+          provider: provider,
+        ),
       ),
     );
   }

@@ -11,6 +11,7 @@ import 'screens/exercises_screen.dart';
 import 'screens/stats_screen.dart';
 import 'screens/profile_screen.dart';
 import 'screens/onboarding_welcome_screen.dart';
+import 'widgets/bottom_nav_bar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +30,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: provider),
-        ChangeNotifierProvider(create: (_) => StepProvider()),
+        ChangeNotifierProvider(create: (_) => ActivityRingsProvider()),
       ],
       child: const TechnoGMApp(),
     ),
@@ -95,54 +96,12 @@ class _RootShellState extends State<_RootShell> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       body: IndexedStack(index: _tab, children: _screens),
-      bottomNavigationBar: _NavBar(
+      bottomNavigationBar: TechnoNavBar(
         current: _tab,
         onTap: (i) => setState(() => _tab = i),
       ),
-    );
-  }
-}
-
-class _NavBar extends StatelessWidget {
-  final int current;
-  final ValueChanged<int> onTap;
-
-  const _NavBar({required this.current, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationBar(
-      selectedIndex: current,
-      onDestinationSelected: onTap,
-      height: 64,
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'HOME',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.fitness_center_outlined),
-          selectedIcon: Icon(Icons.fitness_center),
-          label: 'WORKOUT',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.menu_book_outlined),
-          selectedIcon: Icon(Icons.menu_book),
-          label: 'EXERCISES',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.bar_chart_outlined),
-          selectedIcon: Icon(Icons.bar_chart),
-          label: 'STATS',
-        ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
-          label: 'PROFILE',
-        ),
-      ],
     );
   }
 }

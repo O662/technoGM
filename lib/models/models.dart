@@ -408,25 +408,29 @@ class StreakData {
   int bestWeekStreak;
   int weeklySessionGoal;
   int weeklyMinutesGoal;
+  int weeklyStepDaysGoal;
 
   StreakData({
     this.currentWeekStreak = 0,
     this.bestWeekStreak = 0,
     this.weeklySessionGoal = 3,
     this.weeklyMinutesGoal = 150,
+    this.weeklyStepDaysGoal = 5,
   });
 
   StreakData.fromJson(Map<String, dynamic> j)
     : currentWeekStreak = j['currentWeekStreak'] as int? ?? 0,
       bestWeekStreak = j['bestWeekStreak'] as int? ?? 0,
       weeklySessionGoal = j['weeklySessionGoal'] as int? ?? 3,
-      weeklyMinutesGoal = j['weeklyMinutesGoal'] as int? ?? 150;
+      weeklyMinutesGoal = j['weeklyMinutesGoal'] as int? ?? 150,
+      weeklyStepDaysGoal = j['weeklyStepDaysGoal'] as int? ?? 5;
 
   Map<String, dynamic> toJson() => {
     'currentWeekStreak': currentWeekStreak,
     'bestWeekStreak': bestWeekStreak,
     'weeklySessionGoal': weeklySessionGoal,
     'weeklyMinutesGoal': weeklyMinutesGoal,
+    'weeklyStepDaysGoal': weeklyStepDaysGoal,
   };
 }
 

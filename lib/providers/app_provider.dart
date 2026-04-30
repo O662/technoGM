@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../models/models.dart';
+import '../services/step_service.dart';
 import '../services/storage_service.dart';
 
 class AppProvider extends ChangeNotifier {
@@ -137,7 +138,7 @@ class AppProvider extends ChangeNotifier {
     _updatePRs(completed);
 
     // Update streaks
-    _updateStreak();
+    await _updateStreak();
 
     await _save();
     notifyListeners();
@@ -159,35 +160,16 @@ class AppProvider extends ChangeNotifier {
 
   // ─── Streak logic ──────────────────────────────────────────────────────────
 
-  void _updateStreak() {
+  Future<void> _updateStreak() async {
     final streak = _data.streak;
     final now = DateTime.now();
-    final weekStart = _weekStart(now);
-    final prevWeekStart = weekStart.subtract(const Duration(days: 7));
 
-    // Check current week
-    final thisWeekWorkouts = _workoutsInWeek(weekStart);
-    final prevWeekWorkouts = _workoutsInWeek(prevWeekStart);
-
-    final thisWeekQualifies = _weekQualifies(thisWeekWorkouts, streak);
-    final prevWeekQualifies = _weekQualifies(prevWeekWorkouts, streak);
-
-    // Update current streak
-    if (thisWeekQualifies) {
-      if (prevWeekQualifies) {
-        // Continuing from last week — streak may have been updated then
-        // Only increment if we haven't already counted this week
-      } else {
-        // Starting fresh this week (prev week was good because it was tracked then)
-      }
-    }
-
-    // Simple streak: count consecutive weeks back from now
     int streak0 = 0;
-    DateTime checkWeek = weekStart;
+    DateTime checkWeek = _weekStart(now);
     while (true) {
       final ws = _workoutsInWeek(checkWeek);
-      if (_weekQualifies(ws, streak)) {
+      final stepDays = await StepService.weekStepGoalDays(checkWeek, 10000);
+      if (_weekQualifies(ws, streak, stepDays)) {
         streak0++;
         checkWeek = checkWeek.subtract(const Duration(days: 7));
       } else {
@@ -214,7 +196,8 @@ class AppProvider extends ChangeNotifier {
     }).toList();
   }
 
-  bool _weekQualifies(List<CompletedWorkout> workouts, StreakData streak) {
+  bool _weekQualifies(List<CompletedWorkout> workouts, StreakData streak, int stepDays) {
+    if (stepDays < streak.weeklyStepDaysGoal) return false;
     if (workouts.length >= streak.weeklySessionGoal) return true;
     final totalMins = workouts.fold(0, (sum, w) => sum + w.durationMinutes);
     return totalMins >= streak.weeklyMinutesGoal;
@@ -230,9 +213,10 @@ class AppProvider extends ChangeNotifier {
         .fold(0, (sum, w) => sum + w.durationMinutes);
   }
 
-  bool get thisWeekComplete {
+  Future<bool> get thisWeekComplete async {
     final w = _workoutsInWeek(_weekStart(DateTime.now()));
-    return _weekQualifies(w, _data.streak);
+    final stepDays = await StepService.weekStepGoalDays(_weekStart(DateTime.now()), 10000);
+    return _weekQualifies(w, _data.streak, stepDays);
   }
 
   // ─── Personal Records ──────────────────────────────────────────────────────

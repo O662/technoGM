@@ -78,7 +78,9 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final provider = context.watch<AppProvider>();
     final workout = provider.activeWorkout;
     if (workout == null) {
-      Navigator.of(context).pop();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).maybePop();
+      });
       return const SizedBox.shrink();
     }
 

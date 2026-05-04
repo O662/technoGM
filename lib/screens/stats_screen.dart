@@ -5,6 +5,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/models.dart';
+import '../services/step_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
 import 'history_screen.dart';
@@ -22,7 +23,7 @@ class _StatsScreenState extends State<StatsScreen> {
     final provider = context.watch<AppProvider>();
 
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('STATS'),
@@ -42,6 +43,7 @@ class _StatsScreenState extends State<StatsScreen> {
             ),
             tabs: const [
               Tab(text: 'OVERVIEW'),
+              Tab(text: 'CALENDAR'),
               Tab(text: 'HISTORY'),
             ],
           ),
@@ -49,6 +51,7 @@ class _StatsScreenState extends State<StatsScreen> {
         body: TabBarView(
           children: [
             _OverviewTab(provider: provider),
+            const _CalendarTab(),
             const _HistoryTab(),
           ],
         ),
@@ -1029,4 +1032,833 @@ class _SectionLabel extends StatelessWidget {
           letterSpacing: 2,
         ),
       );
+}
+
+// ── Calendar Tab ──────────────────────────────────────────────────────────────
+
+class _CalendarTab extends StatefulWidget {
+  const _CalendarTab();
+
+  @override
+  State<_CalendarTab> createState() => _CalendarTabState();
+}
+
+class _CalendarTabState extends State<_CalendarTab> {
+  late DateTime _focusedMonth;
+  final Map<String, int?> _stepsByDay = {};
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _focusedMonth = DateTime(now.year, now.month);
+    _loadStepsForMonth(_focusedMonth);
+  }
+
+  String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+  Future<void> _loadStepsForMonth(DateTime month) async {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+
+    final dates = <DateTime>[];
+    for (int d = 1; d <= daysInMonth; d++) {
+      final date = DateTime(month.year, month.month, d);
+      if (date.isAfter(today)) break;
+      dates.add(date);
+    }
+
+    final results = await Future.wait(dates.map(StepService.stepsForDay));
+    if (!mounted) return;
+    setState(() {
+      for (int i = 0; i < dates.length; i++) {
+        _stepsByDay[_dayKey(dates[i])] = results[i];
+      }
+    });
+  }
+
+  void _changeMonth(DateTime newMonth) {
+    setState(() => _focusedMonth = newMonth);
+    _loadStepsForMonth(newMonth);
+  }
+
+  void _openWeekView(BuildContext context, DateTime date, List<CompletedWorkout> workouts) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _WeekViewSheet(selectedDate: date, allWorkouts: workouts),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<AppProvider>();
+    final workouts = provider.data.workouts;
+
+    final workoutsByDay = <String, List<CompletedWorkout>>{};
+    for (final w in workouts) {
+      final key = _dayKey(w.startTime);
+      workoutsByDay[key] = [...(workoutsByDay[key] ?? []), w];
+    }
+
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _focusedMonth.year == now.year && _focusedMonth.month == now.month;
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Month navigation header
+        Row(
+          children: [
+            IconButton(
+              onPressed: () => _changeMonth(
+                  DateTime(_focusedMonth.year, _focusedMonth.month - 1)),
+              icon: const Icon(Icons.chevron_left, color: TechnoColors.neonCyan),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+            Expanded(
+              child: Text(
+                DateFormat('MMMM yyyy').format(_focusedMonth).toUpperCase(),
+                textAlign: TextAlign.center,
+                style: GoogleFonts.orbitron(
+                  color: TechnoColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 2,
+                ),
+              ),
+            ),
+            IconButton(
+              onPressed: isCurrentMonth
+                  ? null
+                  : () => _changeMonth(
+                      DateTime(_focusedMonth.year, _focusedMonth.month + 1)),
+              icon: Icon(
+                Icons.chevron_right,
+                color: isCurrentMonth
+                    ? TechnoColors.textMuted
+                    : TechnoColors.neonCyan,
+              ),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Day-of-week labels
+        Row(
+          children: ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
+              .map((d) => Expanded(
+                    child: Text(
+                      d,
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.orbitron(
+                        color: TechnoColors.textMuted,
+                        fontSize: 9,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 6),
+        // Calendar grid
+        _CalendarGrid(
+          focusedMonth: _focusedMonth,
+          workoutsByDay: workoutsByDay,
+          stepsByDay: _stepsByDay,
+          weeklySessionGoal: provider.data.streak.weeklySessionGoal,
+          onDayTapped: (date) => _openWeekView(context, date, workouts),
+        ),
+        const SizedBox(height: 16),
+        // Legend
+        Wrap(
+          spacing: 14,
+          runSpacing: 8,
+          children: [
+            (TechnoColors.neonCyan, 'Strength'),
+            (TechnoColors.neonGreen, 'Cardio'),
+            (TechnoColors.neonPink, 'HIIT'),
+            (TechnoColors.neonPurple, 'Bodyweight'),
+            (TechnoColors.neonOrange, 'Mixed'),
+          ]
+              .map((item) => Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(
+                          color: item.$1,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: item.$1.withValues(alpha: 0.5),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        item.$2,
+                        style: GoogleFonts.rajdhani(
+                          color: TechnoColors.textMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+}
+
+// ── Calendar Grid ─────────────────────────────────────────────────────────────
+
+class _CalendarGrid extends StatelessWidget {
+  final DateTime focusedMonth;
+  final Map<String, List<CompletedWorkout>> workoutsByDay;
+  final Map<String, int?> stepsByDay;
+  final int weeklySessionGoal;
+  final void Function(DateTime) onDayTapped;
+
+  const _CalendarGrid({
+    required this.focusedMonth,
+    required this.workoutsByDay,
+    required this.stepsByDay,
+    required this.weeklySessionGoal,
+    required this.onDayTapped,
+  });
+
+  String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+  bool _isToday(DateTime d) {
+    final now = DateTime.now();
+    return d.year == now.year && d.month == now.month && d.day == now.day;
+  }
+
+  Color _typeColor(WorkoutType t) {
+    switch (t) {
+      case WorkoutType.strength:
+        return TechnoColors.neonCyan;
+      case WorkoutType.cardio:
+        return TechnoColors.neonGreen;
+      case WorkoutType.hiit:
+        return TechnoColors.neonPink;
+      case WorkoutType.bodyweight:
+        return TechnoColors.neonPurple;
+      case WorkoutType.mixed:
+        return TechnoColors.neonOrange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final firstDay = DateTime(focusedMonth.year, focusedMonth.month, 1);
+    final daysInMonth =
+        DateTime(focusedMonth.year, focusedMonth.month + 1, 0).day;
+    final startOffset = firstDay.weekday - 1; // Mon=0, Sun=6
+    final rows = ((startOffset + daysInMonth) / 7).ceil();
+
+    return NeonCard(
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        children: List.generate(rows, (rowIndex) {
+          // Count sessions this week row for the qualifying tint
+          int weekSessions = 0;
+          for (int col = 0; col < 7; col++) {
+            final dayNum = rowIndex * 7 + col - startOffset + 1;
+            if (dayNum >= 1 && dayNum <= daysInMonth) {
+              final d = DateTime(focusedMonth.year, focusedMonth.month, dayNum);
+              weekSessions += workoutsByDay[_dayKey(d)]?.length ?? 0;
+            }
+          }
+          final weekMet = weekSessions >= weeklySessionGoal;
+          final weekPartial = weekSessions > 0 && !weekMet;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 2),
+            decoration: BoxDecoration(
+              color: weekMet
+                  ? TechnoColors.neonGreen.withValues(alpha: 0.05)
+                  : weekPartial
+                      ? TechnoColors.neonYellow.withValues(alpha: 0.03)
+                      : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              children: List.generate(7, (colIndex) {
+                final dayNum = rowIndex * 7 + colIndex - startOffset + 1;
+                if (dayNum < 1 || dayNum > daysInMonth) {
+                  return const Expanded(child: SizedBox(height: 54));
+                }
+                final date =
+                    DateTime(focusedMonth.year, focusedMonth.month, dayNum);
+                final dayWorkouts = workoutsByDay[_dayKey(date)] ?? [];
+                final steps = stepsByDay[_dayKey(date)];
+
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => onDayTapped(date),
+                    child: _DayCell(
+                      date: date,
+                      workouts: dayWorkouts,
+                      steps: steps,
+                      isToday: _isToday(date),
+                      typeColor: _typeColor,
+                    ),
+                  ),
+                );
+              }),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+// ── Day Cell ──────────────────────────────────────────────────────────────────
+
+class _DayCell extends StatelessWidget {
+  final DateTime date;
+  final List<CompletedWorkout> workouts;
+  final int? steps;
+  final bool isToday;
+  final Color Function(WorkoutType) typeColor;
+
+  const _DayCell({
+    required this.date,
+    required this.workouts,
+    required this.steps,
+    required this.isToday,
+    required this.typeColor,
+  });
+
+  static Color _stepColor(int s) {
+    if (s >= 10000) return TechnoColors.neonGreen;
+    if (s >= 7000) return TechnoColors.neonYellow;
+    return TechnoColors.textMuted;
+  }
+
+  static String _formatSteps(int s) =>
+      s >= 1000 ? '${(s / 1000).toStringAsFixed(1)}k' : '$s';
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final cellDay = DateTime(date.year, date.month, date.day);
+    final isFuture = cellDay.isAfter(today);
+    final hasWorkout = workouts.isNotEmpty;
+    final showSteps = steps != null && steps! > 0 && !isFuture;
+
+    return Container(
+      height: 66,
+      margin: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: isToday
+            ? TechnoColors.neonCyan.withValues(alpha: 0.10)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(8),
+        border: isToday
+            ? Border.all(color: TechnoColors.neonCyan, width: 1.5)
+            : hasWorkout
+                ? Border.all(
+                    color: TechnoColors.cardBorder.withValues(alpha: 0.6))
+                : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Day number
+          Text(
+            '${date.day}',
+            style: GoogleFonts.orbitron(
+              color: isToday
+                  ? TechnoColors.neonCyan
+                  : isFuture
+                      ? TechnoColors.textMuted.withValues(alpha: 0.4)
+                      : TechnoColors.textSecondary,
+              fontSize: 11,
+              fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 2),
+          // Workout dots
+          if (hasWorkout)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ...workouts.take(3).map((w) => Container(
+                      width: 5,
+                      height: 5,
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      decoration: BoxDecoration(
+                        color: typeColor(w.type),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: typeColor(w.type).withValues(alpha: 0.7),
+                            blurRadius: 3,
+                          ),
+                        ],
+                      ),
+                    )),
+                if (workouts.length > 3)
+                  Text(
+                    '+${workouts.length - 3}',
+                    style: GoogleFonts.orbitron(
+                      color: TechnoColors.textMuted,
+                      fontSize: 7,
+                    ),
+                  ),
+              ],
+            )
+          else
+            const SizedBox(height: 7),
+          const SizedBox(height: 2),
+          // Step count
+          if (showSteps)
+            Text(
+              _formatSteps(steps!),
+              style: GoogleFonts.orbitron(
+                color: _stepColor(steps!),
+                fontSize: 7,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            const SizedBox(height: 9),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Week View Sheet ───────────────────────────────────────────────────────────
+
+class _WeekViewSheet extends StatefulWidget {
+  final DateTime selectedDate;
+  final List<CompletedWorkout> allWorkouts;
+
+  const _WeekViewSheet({
+    required this.selectedDate,
+    required this.allWorkouts,
+  });
+
+  @override
+  State<_WeekViewSheet> createState() => _WeekViewSheetState();
+}
+
+class _WeekViewSheetState extends State<_WeekViewSheet> {
+  final Map<int, int?> _stepsByIndex = {};
+
+  DateTime get _weekStart {
+    final offset = (widget.selectedDate.weekday - 1) % 7;
+    return DateTime(widget.selectedDate.year, widget.selectedDate.month,
+        widget.selectedDate.day - offset);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSteps();
+  }
+
+  Future<void> _loadSteps() async {
+    final ws = _weekStart;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final days = List.generate(7, (i) => ws.add(Duration(days: i)));
+
+    final futures = <Future<int?>>[];
+    final indices = <int>[];
+    for (int i = 0; i < 7; i++) {
+      if (!days[i].isAfter(today)) {
+        futures.add(StepService.stepsForDay(days[i]));
+        indices.add(i);
+      }
+    }
+
+    final results = await Future.wait(futures);
+    if (!mounted) return;
+    setState(() {
+      for (int j = 0; j < indices.length; j++) {
+        _stepsByIndex[indices[j]] = results[j];
+      }
+    });
+  }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  Color _typeColor(WorkoutType t) {
+    switch (t) {
+      case WorkoutType.strength:
+        return TechnoColors.neonCyan;
+      case WorkoutType.cardio:
+        return TechnoColors.neonGreen;
+      case WorkoutType.hiit:
+        return TechnoColors.neonPink;
+      case WorkoutType.bodyweight:
+        return TechnoColors.neonPurple;
+      case WorkoutType.mixed:
+        return TechnoColors.neonOrange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ws = _weekStart;
+    final we = ws.add(const Duration(days: 6));
+    final days = List.generate(7, (i) => ws.add(Duration(days: i)));
+
+    final byIndex = <int, List<CompletedWorkout>>{};
+    for (int i = 0; i < 7; i++) {
+      byIndex[i] = widget.allWorkouts
+          .where((w) => _sameDay(w.startTime, days[i]))
+          .toList();
+    }
+
+    final totalWorkouts = byIndex.values.fold(0, (s, l) => s + l.length);
+    final totalMins = byIndex.values
+        .fold(0, (s, l) => s + l.fold(0, (s2, w) => s2 + w.durationMinutes));
+    final totalCal = byIndex.values
+        .fold(0, (s, l) => s + l.fold(0, (s2, w) => s2 + w.caloriesBurned));
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.72,
+      minChildSize: 0.4,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollController) => Container(
+        decoration: BoxDecoration(
+          color: TechnoColors.bgSecondary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: TechnoColors.cardBorder),
+        ),
+        child: ListView(
+          controller: scrollController,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+          children: [
+            // Drag handle
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: TechnoColors.cardBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            // Week range
+            Text(
+              'WEEK  ${DateFormat('d MMM').format(ws).toUpperCase()} – ${DateFormat('d MMM').format(we).toUpperCase()}',
+              style: GoogleFonts.orbitron(
+                color: TechnoColors.textSecondary,
+                fontSize: 11,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Summary pills
+            Row(
+              children: [
+                _WeekStatPill(
+                  value: '$totalWorkouts',
+                  label: 'SESSIONS',
+                  color: TechnoColors.neonCyan,
+                ),
+                const SizedBox(width: 8),
+                _WeekStatPill(
+                  value: totalMins >= 60
+                      ? '${(totalMins / 60).toStringAsFixed(1)}h'
+                      : '${totalMins}m',
+                  label: 'ACTIVE',
+                  color: TechnoColors.neonPurple,
+                ),
+                const SizedBox(width: 8),
+                _WeekStatPill(
+                  value: '~$totalCal',
+                  label: 'CALS',
+                  color: TechnoColors.neonOrange,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Day-by-day rows
+            ...List.generate(7, (i) {
+              final day = days[i];
+              final dayWorkouts = byIndex[i] ?? [];
+              return _WeekDayRow(
+                date: day,
+                workouts: dayWorkouts,
+                steps: _stepsByIndex[i],
+                isToday: _sameDay(day, DateTime.now()),
+                isSelected: _sameDay(day, widget.selectedDate),
+                typeColor: _typeColor,
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Week Stat Pill ────────────────────────────────────────────────────────────
+
+class _WeekStatPill extends StatelessWidget {
+  final String value;
+  final String label;
+  final Color color;
+
+  const _WeekStatPill({
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: GoogleFonts.orbitron(
+                color: color,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            Text(
+              label,
+              style: GoogleFonts.rajdhani(
+                color: TechnoColors.textMuted,
+                fontSize: 9,
+                letterSpacing: 1,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Week Day Row ──────────────────────────────────────────────────────────────
+
+class _WeekDayRow extends StatelessWidget {
+  final DateTime date;
+  final List<CompletedWorkout> workouts;
+  final int? steps;
+  final bool isToday;
+  final bool isSelected;
+  final Color Function(WorkoutType) typeColor;
+
+  const _WeekDayRow({
+    required this.date,
+    required this.workouts,
+    required this.steps,
+    required this.isToday,
+    required this.isSelected,
+    required this.typeColor,
+  });
+
+  static Color _stepColor(int s) {
+    if (s >= 10000) return TechnoColors.neonGreen;
+    if (s >= 7000) return TechnoColors.neonYellow;
+    return TechnoColors.textMuted;
+  }
+
+  static String _formatSteps(int s) =>
+      s >= 1000 ? '${(s / 1000).toStringAsFixed(1)}k' : '$s';
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final isFuture = DateTime(date.year, date.month, date.day).isAfter(today);
+    final showSteps = steps != null && steps! > 0 && !isFuture;
+
+    final accentColor = isToday
+        ? TechnoColors.neonCyan
+        : isSelected
+            ? TechnoColors.neonPurple
+            : null;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Date badge
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: accentColor != null
+                  ? accentColor.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: accentColor ?? TechnoColors.cardBorder,
+                width: accentColor != null ? 1.5 : 1,
+              ),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  DateFormat('E').format(date).toUpperCase(),
+                  style: GoogleFonts.orbitron(
+                    color: accentColor ?? TechnoColors.textMuted,
+                    fontSize: 7,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                Text(
+                  '${date.day}',
+                  style: GoogleFonts.orbitron(
+                    color: accentColor ?? TechnoColors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Content
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (workouts.isNotEmpty)
+                  ...workouts.map((w) => _WorkoutPill(
+                        workout: w,
+                        color: typeColor(w.type),
+                      ))
+                else
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      isFuture ? '—' : 'Rest day',
+                      style: GoogleFonts.rajdhani(
+                        color: TechnoColors.textMuted,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                if (showSteps) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.directions_walk,
+                          size: 11, color: _stepColor(steps!)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${_formatSteps(steps!)} steps',
+                        style: GoogleFonts.rajdhani(
+                          color: _stepColor(steps!),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (steps! >= 10000) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '✓',
+                          style: TextStyle(
+                            color: TechnoColors.neonGreen,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Workout Pill ──────────────────────────────────────────────────────────────
+
+class _WorkoutPill extends StatelessWidget {
+  final CompletedWorkout workout;
+  final Color color;
+
+  const _WorkoutPill({required this.workout, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Text(workout.type.emoji, style: const TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  workout.name,
+                  style: GoogleFonts.rajdhani(
+                    color: TechnoColors.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Text(
+                  '${workout.durationMinutes} min · ${workout.exercises.length} exercises',
+                  style: GoogleFonts.rajdhani(
+                    color: TechnoColors.textMuted,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            DateFormat('HH:mm').format(workout.startTime),
+            style: GoogleFonts.orbitron(
+              color: color,
+              fontSize: 10,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

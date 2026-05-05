@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../services/step_service.dart';
 import '../services/storage_service.dart';
@@ -291,6 +292,15 @@ class AppProvider extends ChangeNotifier {
   // ─── Export / Import ───────────────────────────────────────────────────────
 
   Future<bool> exportData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final waterByDay = <String, double>{};
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith('water_ml_')) continue;
+      // key format: water_ml_YYYY_MM_DD → date: YYYY-MM-DD
+      final datePart = key.substring('water_ml_'.length).replaceAll('_', '-');
+      waterByDay[datePart] = prefs.getDouble(key) ?? 0.0;
+    }
+    _data.waterByDay = waterByDay;
     return _storage.export(_data);
   }
 
@@ -299,6 +309,12 @@ class AppProvider extends ChangeNotifier {
     if (imported == null) return false;
     _data = imported;
     await _save();
+    // Restore water entries into SharedPreferences so WaterService reads them
+    final prefs = await SharedPreferences.getInstance();
+    for (final entry in _data.waterByDay.entries) {
+      final key = 'water_ml_${entry.key.replaceAll('-', '_')}';
+      await prefs.setDouble(key, entry.value);
+    }
     notifyListeners();
     return true;
   }

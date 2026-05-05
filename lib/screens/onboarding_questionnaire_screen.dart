@@ -76,6 +76,7 @@ class _OnboardingQuestionnaireScreenState
       (_weightKg - 10).clamp(30.0, _weightKg - 1.0);
 
   void _next() {
+    FocusScope.of(context).unfocus();
     // Skip goal-weight page if lose-weight goal not selected
     if (_currentPage == 5 && !_goals.contains(FitnessGoal.loseWeight)) {
       _finish();
@@ -105,6 +106,7 @@ class _OnboardingQuestionnaireScreenState
     final profile = UserProfile(
       name: _name.trim(),
       heightCm: _heightCm,
+      preferCm: _preferCm,
       fitnessLevel: _fitnessLevel,
       preferKg: _preferKg,
       preferGym: _preferGym,
@@ -270,6 +272,7 @@ class _StepName extends StatefulWidget {
 
 class _StepNameState extends State<_StepName> {
   late final TextEditingController _ctrl;
+  final _focusNode = FocusNode();
 
   @override
   void initState() {
@@ -278,8 +281,24 @@ class _StepNameState extends State<_StepName> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null && route.animation != null) {
+      route.animation!.addStatusListener(_onRouteAnimated);
+    }
+  }
+
+  void _onRouteAnimated(AnimationStatus status) {
+    if (status == AnimationStatus.completed && mounted) {
+      _focusNode.requestFocus();
+    }
+  }
+
+  @override
   void dispose() {
     _ctrl.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -290,7 +309,8 @@ class _StepNameState extends State<_StepName> {
       subtitle: 'How should we address you?',
       child: TextField(
         controller: _ctrl,
-        autofocus: true,
+        focusNode: _focusNode,
+        autofocus: false,
         textCapitalization: TextCapitalization.words,
         style: GoogleFonts.rajdhani(
             color: TechnoColors.textPrimary,

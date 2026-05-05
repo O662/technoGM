@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../services/step_service.dart';
 import '../services/home_widget_service.dart';
 import '../services/water_service.dart';
+export '../services/water_service.dart' show WaterEntry;
 
 enum RingsStatus { idle, loading, granted, denied, unavailable }
 
@@ -10,14 +11,18 @@ class ActivityRingsProvider extends ChangeNotifier {
   int? _steps;
   double? _caloriesKcal;
   int? _activeMinutes;
+  List<ActivityEntry> _activityEntries = [];
+  List<StepEntry> _stepEntries = [];
+  List<CalorieEntry> _calorieEntries = [];
   double? _waterMl;
+  List<WaterEntry> _waterEntries = [];
   int? _weeklyStepGoalDays;
   RingsStatus _status = RingsStatus.idle;
   DateTime? _lastSynced;
   Timer? _timer;
 
   static const int stepsGoal = 10000;
-  static const double caloriesGoal = 500.0;
+  static const double caloriesGoal = 2000.0;
   static const int activeMinutesGoal = 30;
   static const double waterGoalMl = 2000.0;
   static const int weeklyStepDaysGoal = 5;
@@ -25,7 +30,11 @@ class ActivityRingsProvider extends ChangeNotifier {
   int? get steps => _steps;
   double? get caloriesKcal => _caloriesKcal;
   int? get activeMinutes => _activeMinutes;
+  List<ActivityEntry> get activityEntries => _activityEntries;
+  List<StepEntry> get stepEntries => _stepEntries;
+  List<CalorieEntry> get calorieEntries => _calorieEntries;
   double? get waterMl => _waterMl;
+  List<WaterEntry> get waterEntries => _waterEntries;
   int? get weeklyStepGoalDays => _weeklyStepGoalDays;
   RingsStatus get status => _status;
   DateTime? get lastSynced => _lastSynced;
@@ -76,16 +85,24 @@ class ActivityRingsProvider extends ChangeNotifier {
     final weekStart = _weekStart(DateTime.now());
     final results = await Future.wait([
       StepService.todaySteps(),
-      StepService.todayActiveCaloriesKcal(),
-      StepService.todayActiveMinutes(),
+      StepService.todayTotalCaloriesKcal(),
+      StepService.todayActivityData(),
       StepService.todayWaterMl(),
       StepService.weekStepGoalDays(weekStart, stepsGoal),
+      StepService.todayStepEntries(),
+      StepService.todayCalorieEntries(),
+      WaterService.getTodayEntries(),
     ]);
     _steps = results[0] as int?;
     _caloriesKcal = results[1] as double?;
-    _activeMinutes = results[2] as int?;
+    final activityResult = results[2] as ActivityResult?;
+    _activeMinutes = activityResult?.minutes;
+    _activityEntries = activityResult?.entries ?? [];
     _waterMl = results[3] as double?;
     _weeklyStepGoalDays = results[4] as int;
+    _stepEntries = results[5] as List<StepEntry>;
+    _calorieEntries = results[6] as List<CalorieEntry>;
+    _waterEntries = results[7] as List<WaterEntry>;
     _lastSynced = DateTime.now();
 
     unawaited(HomeWidgetService.updateAll(
@@ -99,6 +116,16 @@ class ActivityRingsProvider extends ChangeNotifier {
   Future<void> addWater(double ml) async {
     final newTotal = await WaterService.addWater(ml);
     _waterMl = newTotal;
+    _waterEntries = await WaterService.getTodayEntries();
+    notifyListeners();
+    unawaited(HomeWidgetService.updateWaterOnly(newTotal));
+  }
+
+  /// [index] is the position in the chronological (stored) list.
+  Future<void> removeWaterEntry(int index) async {
+    final newTotal = await WaterService.removeEntry(index);
+    _waterMl = newTotal;
+    _waterEntries = await WaterService.getTodayEntries();
     notifyListeners();
     unawaited(HomeWidgetService.updateWaterOnly(newTotal));
   }

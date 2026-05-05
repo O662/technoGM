@@ -474,6 +474,7 @@ class PersonalRecord {
 class UserProfile {
   String name;
   double heightCm;
+  bool preferCm;
   List<InjuryArea> injuries;
   FitnessLevel fitnessLevel;
   List<MuscleGroup> focusAreas;
@@ -487,6 +488,7 @@ class UserProfile {
   UserProfile({
     this.name = '',
     this.heightCm = 170,
+    this.preferCm = true,
     this.injuries = const [],
     this.fitnessLevel = FitnessLevel.intermediate,
     this.focusAreas = const [],
@@ -501,6 +503,7 @@ class UserProfile {
   UserProfile.fromJson(Map<String, dynamic> j)
     : name = j['name'] as String? ?? '',
       heightCm = (j['heightCm'] as num?)?.toDouble() ?? 170,
+      preferCm = j['preferCm'] as bool? ?? true,
       injuries =
           (j['injuries'] as List? ?? [])
               .map(
@@ -562,6 +565,7 @@ class UserProfile {
   Map<String, dynamic> toJson() => {
     'name': name,
     'heightCm': heightCm,
+    'preferCm': preferCm,
     'injuries': injuries.map((e) => e.name).toList(),
     'fitnessLevel': fitnessLevel.name,
     'focusAreas': focusAreas.map((e) => e.name).toList(),
@@ -584,6 +588,7 @@ class AppData {
   List<BodyWeightEntry> weightHistory;
   StreakData streak;
   List<PersonalRecord> personalRecords;
+  Map<String, double> waterByDay;
   DateTime? lastExported;
   bool hasCompletedOnboarding;
 
@@ -593,13 +598,15 @@ class AppData {
     List<BodyWeightEntry>? weightHistory,
     StreakData? streak,
     List<PersonalRecord>? personalRecords,
+    Map<String, double>? waterByDay,
     this.lastExported,
     this.hasCompletedOnboarding = false,
   }) : profile = profile ?? UserProfile(),
        workouts = workouts ?? [],
        weightHistory = weightHistory ?? [],
        streak = streak ?? StreakData(),
-       personalRecords = personalRecords ?? [];
+       personalRecords = personalRecords ?? [],
+       waterByDay = waterByDay ?? {};
 
   AppData.fromJson(Map<String, dynamic> j)
     : profile = UserProfile.fromJson(j['profile'] as Map<String, dynamic>? ?? {}),
@@ -616,6 +623,9 @@ class AppData {
           (j['personalRecords'] as List? ?? [])
               .map((e) => PersonalRecord.fromJson(e))
               .toList(),
+      waterByDay = (j['waterByDay'] as Map<String, dynamic>? ?? {}).map(
+        (k, v) => MapEntry(k, (v as num).toDouble()),
+      ),
       lastExported =
           j['lastExported'] != null ? DateTime.parse(j['lastExported'] as String) : null,
       hasCompletedOnboarding = j['hasCompletedOnboarding'] as bool? ?? false;
@@ -626,6 +636,7 @@ class AppData {
     'weightHistory': weightHistory.map((e) => e.toJson()).toList(),
     'streak': streak.toJson(),
     'personalRecords': personalRecords.map((e) => e.toJson()).toList(),
+    'waterByDay': waterByDay,
     'lastExported': lastExported?.toIso8601String(),
     'hasCompletedOnboarding': hasCompletedOnboarding,
     '_exportedAt': DateTime.now().toIso8601String(),

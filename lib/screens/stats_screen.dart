@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../providers/app_provider.dart';
 import '../models/models.dart';
 import '../services/step_service.dart';
+import '../services/water_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/neon_card.dart';
 import 'history_screen.dart';
@@ -102,6 +104,12 @@ class _OverviewTab extends StatelessWidget {
       children: [
         // ── Summary Row ─────────────────────────────────────────────────
         _SummaryRow(provider: provider),
+        const SizedBox(height: 16),
+
+        // ── This Week ───────────────────────────────────────────────────
+        _SectionLabel(label: 'THIS WEEK'),
+        const SizedBox(height: 8),
+        _ThisWeekCard(provider: provider),
         const SizedBox(height: 16),
 
         // ── Weekly Frequency ────────────────────────────────────────────
@@ -1034,6 +1042,295 @@ class _SectionLabel extends StatelessWidget {
       );
 }
 
+// ── This Week Card (Overview) ─────────────────────────────────────────────────
+
+class _ThisWeekCard extends StatefulWidget {
+  final AppProvider provider;
+  const _ThisWeekCard({required this.provider});
+
+  @override
+  State<_ThisWeekCard> createState() => _ThisWeekCardState();
+}
+
+class _ThisWeekCardState extends State<_ThisWeekCard> {
+  final Map<int, int?> _stepsByIndex = {};
+  final Map<int, double> _waterByIndex = {};
+  final Map<int, double?> _calsByIndex = {};
+  final Map<int, int?> _activeByIndex = {};
+  late final List<DateTime> _days;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    _days = List.generate(7, (i) => today.subtract(Duration(days: 6 - i)));
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final results = await Future.wait([
+      Future.wait(_days.map(StepService.stepsForDay)),
+      Future.wait(_days.map(WaterService.getWaterForDay)),
+      Future.wait(_days.map(StepService.caloriesForDay)),
+      Future.wait(_days.map(StepService.activeMinutesForDay)),
+    ]);
+    if (!mounted) return;
+    final steps = results[0] as List<int?>;
+    final water = results[1] as List<double>;
+    final cals = results[2] as List<double?>;
+    final active = results[3] as List<int?>;
+    setState(() {
+      for (int i = 0; i < 7; i++) {
+        _stepsByIndex[i] = steps[i];
+        _waterByIndex[i] = water[i];
+        _calsByIndex[i] = cals[i];
+        _activeByIndex[i] = active[i];
+      }
+    });
+  }
+
+  String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+  Color _typeColor(WorkoutType t) {
+    switch (t) {
+      case WorkoutType.strength:
+        return TechnoColors.neonCyan;
+      case WorkoutType.cardio:
+        return TechnoColors.neonGreen;
+      case WorkoutType.hiit:
+        return TechnoColors.neonPink;
+      case WorkoutType.bodyweight:
+        return TechnoColors.neonPurple;
+      case WorkoutType.mixed:
+        return TechnoColors.neonOrange;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final workouts = widget.provider.data.workouts;
+    final workoutsByDay = <String, List<CompletedWorkout>>{};
+    for (final w in workouts) {
+      final key = _dayKey(w.startTime);
+      workoutsByDay[key] = [...(workoutsByDay[key] ?? []), w];
+    }
+
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    return NeonCard(
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        children: [
+          Row(
+            children: _days
+                .map((day) => Expanded(
+                      child: Text(
+                        DateFormat('E').format(day).toUpperCase(),
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.orbitron(
+                          color: day == today
+                              ? TechnoColors.neonCyan
+                              : TechnoColors.textMuted,
+                          fontSize: 9,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: List.generate(7, (i) {
+              final day = _days[i];
+              final isToday =
+                  day.year == today.year && day.month == today.month && day.day == today.day;
+              return Expanded(
+                child: _MiniRingsCell(
+                  date: day,
+                  workouts: workoutsByDay[_dayKey(day)] ?? [],
+                  stepsP: (_stepsByIndex[i] ?? 0) / 10000.0,
+                  activeP: (_activeByIndex[i] ?? 0) / 30.0,
+                  calsP: (_calsByIndex[i] ?? 0) / 2000.0,
+                  waterP: (_waterByIndex[i] ?? 0.0) / 2000.0,
+                  isToday: isToday,
+                  typeColor: _typeColor,
+                ),
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Mini Rings Cell ───────────────────────────────────────────────────────────
+
+class _MiniRingsCell extends StatelessWidget {
+  final DateTime date;
+  final List<CompletedWorkout> workouts;
+  final double stepsP;
+  final double activeP;
+  final double calsP;
+  final double waterP;
+  final bool isToday;
+  final Color Function(WorkoutType) typeColor;
+
+  const _MiniRingsCell({
+    required this.date,
+    required this.workouts,
+    required this.stepsP,
+    required this.activeP,
+    required this.calsP,
+    required this.waterP,
+    required this.isToday,
+    required this.typeColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final isFuture = DateTime(date.year, date.month, date.day).isAfter(today);
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      decoration: BoxDecoration(
+        color: isToday ? TechnoColors.neonCyan.withValues(alpha: 0.10) : null,
+        borderRadius: BorderRadius.circular(8),
+        border: isToday
+            ? Border.all(color: TechnoColors.neonCyan, width: 1.5)
+            : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${date.day}',
+            style: GoogleFonts.orbitron(
+              color: isToday
+                  ? TechnoColors.neonCyan
+                  : isFuture
+                      ? TechnoColors.textMuted.withValues(alpha: 0.4)
+                      : TechnoColors.textSecondary,
+              fontSize: 11,
+              fontWeight: isToday ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 6),
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: isFuture
+                ? null
+                : CustomPaint(
+                    painter: _MiniRingsPainter(
+                      stepsP: stepsP.clamp(0.0, 1.0),
+                      activeP: activeP.clamp(0.0, 1.0),
+                      calsP: calsP.clamp(0.0, 1.0),
+                      waterP: waterP.clamp(0.0, 1.0),
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 6),
+          if (workouts.isNotEmpty)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: workouts.take(3).map((w) => Container(
+                    width: 4,
+                    height: 4,
+                    margin: const EdgeInsets.symmetric(horizontal: 1),
+                    decoration: BoxDecoration(
+                      color: typeColor(w.type),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: typeColor(w.type).withValues(alpha: 0.7),
+                          blurRadius: 3,
+                        ),
+                      ],
+                    ),
+                  )).toList(),
+            )
+          else
+            const SizedBox(height: 6),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Mini Rings Painter ────────────────────────────────────────────────────────
+
+class _MiniRingsPainter extends CustomPainter {
+  final double stepsP;
+  final double activeP;
+  final double calsP;
+  final double waterP;
+
+  const _MiniRingsPainter({
+    required this.stepsP,
+    required this.activeP,
+    required this.calsP,
+    required this.waterP,
+  });
+
+  static const double _stroke = 3.5;
+  static const double _gap = 1.5;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxR = min(size.width, size.height) / 2 - _stroke / 2 - 1;
+
+    _drawRing(canvas, center, maxR, stepsP, TechnoColors.neonCyan);
+    _drawRing(canvas, center, maxR - (_stroke + _gap), activeP, TechnoColors.neonGreen);
+    _drawRing(canvas, center, maxR - 2 * (_stroke + _gap), calsP, TechnoColors.neonOrange);
+    _drawRing(canvas, center, maxR - 3 * (_stroke + _gap), waterP, TechnoColors.neonPurple);
+  }
+
+  void _drawRing(Canvas canvas, Offset center, double radius, double progress, Color color) {
+    if (radius <= 0) return;
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..color = color.withValues(alpha: 0.15)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _stroke,
+    );
+    if (progress <= 0) return;
+    final sweep = progress * 2 * pi;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawArc(
+      rect, -pi / 2, sweep, false,
+      Paint()
+        ..color = color.withValues(alpha: 0.22)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _stroke + 3
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawArc(
+      rect, -pi / 2, sweep, false,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = _stroke
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_MiniRingsPainter old) =>
+      old.stepsP != stepsP ||
+      old.activeP != activeP ||
+      old.calsP != calsP ||
+      old.waterP != waterP;
+}
+
 // ── Calendar Tab ──────────────────────────────────────────────────────────────
 
 class _CalendarTab extends StatefulWidget {
@@ -1046,18 +1343,19 @@ class _CalendarTab extends StatefulWidget {
 class _CalendarTabState extends State<_CalendarTab> {
   late DateTime _focusedMonth;
   final Map<String, int?> _stepsByDay = {};
+  final Map<String, double> _waterByDay = {};
 
   @override
   void initState() {
     super.initState();
     final now = DateTime.now();
     _focusedMonth = DateTime(now.year, now.month);
-    _loadStepsForMonth(_focusedMonth);
+    _loadMonthData(_focusedMonth);
   }
 
   String _dayKey(DateTime d) => '${d.year}-${d.month}-${d.day}';
 
-  Future<void> _loadStepsForMonth(DateTime month) async {
+  Future<void> _loadMonthData(DateTime month) async {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
@@ -1069,18 +1367,24 @@ class _CalendarTabState extends State<_CalendarTab> {
       dates.add(date);
     }
 
-    final results = await Future.wait(dates.map(StepService.stepsForDay));
+    final results = await Future.wait([
+      Future.wait(dates.map(StepService.stepsForDay)),
+      Future.wait(dates.map(WaterService.getWaterForDay)),
+    ]);
     if (!mounted) return;
+    final steps = results[0] as List<int?>;
+    final water = results[1] as List<double>;
     setState(() {
       for (int i = 0; i < dates.length; i++) {
-        _stepsByDay[_dayKey(dates[i])] = results[i];
+        _stepsByDay[_dayKey(dates[i])] = steps[i];
+        _waterByDay[_dayKey(dates[i])] = water[i];
       }
     });
   }
 
   void _changeMonth(DateTime newMonth) {
     setState(() => _focusedMonth = newMonth);
-    _loadStepsForMonth(newMonth);
+    _loadMonthData(newMonth);
   }
 
   void _openWeekView(BuildContext context, DateTime date, List<CompletedWorkout> workouts) {
@@ -1171,6 +1475,7 @@ class _CalendarTabState extends State<_CalendarTab> {
           focusedMonth: _focusedMonth,
           workoutsByDay: workoutsByDay,
           stepsByDay: _stepsByDay,
+          waterByDay: _waterByDay,
           weeklySessionGoal: provider.data.streak.weeklySessionGoal,
           onDayTapped: (date) => _openWeekView(context, date, workouts),
         ),
@@ -1227,6 +1532,7 @@ class _CalendarGrid extends StatelessWidget {
   final DateTime focusedMonth;
   final Map<String, List<CompletedWorkout>> workoutsByDay;
   final Map<String, int?> stepsByDay;
+  final Map<String, double> waterByDay;
   final int weeklySessionGoal;
   final void Function(DateTime) onDayTapped;
 
@@ -1234,6 +1540,7 @@ class _CalendarGrid extends StatelessWidget {
     required this.focusedMonth,
     required this.workoutsByDay,
     required this.stepsByDay,
+    required this.waterByDay,
     required this.weeklySessionGoal,
     required this.onDayTapped,
   });
@@ -1304,6 +1611,7 @@ class _CalendarGrid extends StatelessWidget {
                     DateTime(focusedMonth.year, focusedMonth.month, dayNum);
                 final dayWorkouts = workoutsByDay[_dayKey(date)] ?? [];
                 final steps = stepsByDay[_dayKey(date)];
+                final water = waterByDay[_dayKey(date)] ?? 0.0;
 
                 return Expanded(
                   child: GestureDetector(
@@ -1312,6 +1620,7 @@ class _CalendarGrid extends StatelessWidget {
                       date: date,
                       workouts: dayWorkouts,
                       steps: steps,
+                      water: water,
                       isToday: _isToday(date),
                       typeColor: _typeColor,
                     ),
@@ -1332,6 +1641,7 @@ class _DayCell extends StatelessWidget {
   final DateTime date;
   final List<CompletedWorkout> workouts;
   final int? steps;
+  final double water;
   final bool isToday;
   final Color Function(WorkoutType) typeColor;
 
@@ -1339,6 +1649,7 @@ class _DayCell extends StatelessWidget {
     required this.date,
     required this.workouts,
     required this.steps,
+    required this.water,
     required this.isToday,
     required this.typeColor,
   });
@@ -1349,8 +1660,17 @@ class _DayCell extends StatelessWidget {
     return TechnoColors.textMuted;
   }
 
+  static Color _waterColor(double ml) {
+    if (ml >= 2000) return TechnoColors.neonPurple;
+    if (ml >= 1000) return TechnoColors.neonPurple.withValues(alpha: 0.6);
+    return TechnoColors.textMuted;
+  }
+
   static String _formatSteps(int s) =>
       s >= 1000 ? '${(s / 1000).toStringAsFixed(1)}k' : '$s';
+
+  static String _formatWater(double ml) =>
+      ml >= 1000 ? '${(ml / 1000).toStringAsFixed(1)}L' : '${ml.round()}ml';
 
   @override
   Widget build(BuildContext context) {
@@ -1360,9 +1680,10 @@ class _DayCell extends StatelessWidget {
     final isFuture = cellDay.isAfter(today);
     final hasWorkout = workouts.isNotEmpty;
     final showSteps = steps != null && steps! > 0 && !isFuture;
+    final showWater = water > 0 && !isFuture;
 
     return Container(
-      height: 66,
+      height: 80,
       margin: const EdgeInsets.all(2),
       decoration: BoxDecoration(
         color: isToday
@@ -1438,6 +1759,27 @@ class _DayCell extends StatelessWidget {
             )
           else
             const SizedBox(height: 9),
+          const SizedBox(height: 2),
+          // Water
+          if (showWater)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.water_drop,
+                    size: 6, color: _waterColor(water)),
+                const SizedBox(width: 1),
+                Text(
+                  _formatWater(water),
+                  style: GoogleFonts.orbitron(
+                    color: _waterColor(water),
+                    fontSize: 6,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            )
+          else
+            const SizedBox(height: 8),
         ],
       ),
     );
@@ -1461,6 +1803,7 @@ class _WeekViewSheet extends StatefulWidget {
 
 class _WeekViewSheetState extends State<_WeekViewSheet> {
   final Map<int, int?> _stepsByIndex = {};
+  final Map<int, double> _waterByIndex = {};
 
   DateTime get _weekStart {
     final offset = (widget.selectedDate.weekday - 1) % 7;
@@ -1471,29 +1814,37 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
   @override
   void initState() {
     super.initState();
-    _loadSteps();
+    _loadWeekData();
   }
 
-  Future<void> _loadSteps() async {
+  Future<void> _loadWeekData() async {
     final ws = _weekStart;
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final days = List.generate(7, (i) => ws.add(Duration(days: i)));
 
-    final futures = <Future<int?>>[];
+    final stepFutures = <Future<int?>>[];
+    final waterFutures = <Future<double>>[];
     final indices = <int>[];
     for (int i = 0; i < 7; i++) {
       if (!days[i].isAfter(today)) {
-        futures.add(StepService.stepsForDay(days[i]));
+        stepFutures.add(StepService.stepsForDay(days[i]));
+        waterFutures.add(WaterService.getWaterForDay(days[i]));
         indices.add(i);
       }
     }
 
-    final results = await Future.wait(futures);
+    final results = await Future.wait([
+      Future.wait(stepFutures),
+      Future.wait(waterFutures),
+    ]);
     if (!mounted) return;
+    final steps = results[0] as List<int?>;
+    final water = results[1] as List<double>;
     setState(() {
       for (int j = 0; j < indices.length; j++) {
-        _stepsByIndex[indices[j]] = results[j];
+        _stepsByIndex[indices[j]] = steps[j];
+        _waterByIndex[indices[j]] = water[j];
       }
     });
   }
@@ -1534,6 +1885,11 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
         .fold(0, (s, l) => s + l.fold(0, (s2, w) => s2 + w.durationMinutes));
     final totalCal = byIndex.values
         .fold(0, (s, l) => s + l.fold(0, (s2, w) => s2 + w.caloriesBurned));
+    final totalWaterMl =
+        _waterByIndex.values.fold(0.0, (s, v) => s + v);
+    final fmtWater = totalWaterMl >= 1000
+        ? '${(totalWaterMl / 1000).toStringAsFixed(1)}L'
+        : '${totalWaterMl.round()}ml';
 
     return DraggableScrollableSheet(
       initialChildSize: 0.72,
@@ -1572,7 +1928,7 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            // Summary pills
+            // Summary pills — 2 × 2 grid
             Row(
               children: [
                 _WeekStatPill(
@@ -1586,13 +1942,23 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
                       ? '${(totalMins / 60).toStringAsFixed(1)}h'
                       : '${totalMins}m',
                   label: 'ACTIVE',
-                  color: TechnoColors.neonPurple,
+                  color: TechnoColors.neonGreen,
                 ),
-                const SizedBox(width: 8),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 _WeekStatPill(
                   value: '~$totalCal',
                   label: 'CALS',
                   color: TechnoColors.neonOrange,
+                ),
+                const SizedBox(width: 8),
+                _WeekStatPill(
+                  value: fmtWater,
+                  label: 'WATER',
+                  color: TechnoColors.neonPurple,
                 ),
               ],
             ),
@@ -1605,6 +1971,7 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
                 date: day,
                 workouts: dayWorkouts,
                 steps: _stepsByIndex[i],
+                water: _waterByIndex[i] ?? 0.0,
                 isToday: _sameDay(day, DateTime.now()),
                 isSelected: _sameDay(day, widget.selectedDate),
                 typeColor: _typeColor,
@@ -1671,6 +2038,7 @@ class _WeekDayRow extends StatelessWidget {
   final DateTime date;
   final List<CompletedWorkout> workouts;
   final int? steps;
+  final double water;
   final bool isToday;
   final bool isSelected;
   final Color Function(WorkoutType) typeColor;
@@ -1679,6 +2047,7 @@ class _WeekDayRow extends StatelessWidget {
     required this.date,
     required this.workouts,
     required this.steps,
+    required this.water,
     required this.isToday,
     required this.isSelected,
     required this.typeColor,
@@ -1690,8 +2059,17 @@ class _WeekDayRow extends StatelessWidget {
     return TechnoColors.textMuted;
   }
 
+  static Color _waterColor(double ml) {
+    if (ml >= 2000) return TechnoColors.neonPurple;
+    if (ml >= 1000) return TechnoColors.neonPurple.withValues(alpha: 0.7);
+    return TechnoColors.textMuted;
+  }
+
   static String _formatSteps(int s) =>
       s >= 1000 ? '${(s / 1000).toStringAsFixed(1)}k' : '$s';
+
+  static String _formatWater(double ml) =>
+      ml >= 1000 ? '${(ml / 1000).toStringAsFixed(1)}L' : '${ml.round()}ml';
 
   @override
   Widget build(BuildContext context) {
@@ -1790,6 +2168,34 @@ class _WeekDayRow extends StatelessWidget {
                           '✓',
                           style: TextStyle(
                             color: TechnoColors.neonGreen,
+                            fontSize: 11,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+                if (water > 0 && !isFuture) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.water_drop,
+                          size: 11, color: _waterColor(water)),
+                      const SizedBox(width: 3),
+                      Text(
+                        '${_formatWater(water)} water',
+                        style: GoogleFonts.rajdhani(
+                          color: _waterColor(water),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (water >= 2000) ...[
+                        const SizedBox(width: 4),
+                        Text(
+                          '✓',
+                          style: TextStyle(
+                            color: TechnoColors.neonPurple,
                             fontSize: 11,
                           ),
                         ),

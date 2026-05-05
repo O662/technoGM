@@ -4,6 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../providers/step_provider.dart';
+import '../screens/active_minutes_screen.dart';
+import '../screens/calories_screen.dart';
+import '../screens/steps_screen.dart';
+import '../screens/water_screen.dart';
 import '../theme/app_theme.dart';
 
 class ActivityRingsWidget extends StatefulWidget {
@@ -17,6 +21,7 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _ctrl;
   ActivityRingsProvider? _provider;
+  RingsStatus? _lastStatus;
 
   @override
   void initState() {
@@ -60,9 +65,14 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
 
   void _onData() {
     if (!mounted) return;
-    if (_provider?.status == RingsStatus.granted) {
+    final status = _provider?.status;
+    // Only run the fill animation when status first transitions to granted.
+    // For incremental updates (addWater, auto-refresh) the controller stays at
+    // t=1.0 and context.watch rebuilds the rings with the new values directly.
+    if (status == RingsStatus.granted && _lastStatus != RingsStatus.granted) {
       _ctrl.forward(from: 0);
     }
+    _lastStatus = status;
   }
 
   @override
@@ -108,6 +118,9 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 label: 'STEPS',
                 value: _fmtSteps(p.steps),
                 goal: '10K',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const StepsScreen()),
+                ),
               ),
               const SizedBox(width: 6),
               _Pill(
@@ -115,6 +128,10 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 label: 'ACTIVE',
                 value: p.activeMinutes != null ? '${p.activeMinutes}m' : '--',
                 goal: '30m',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const ActiveMinutesScreen()),
+                ),
               ),
               const SizedBox(width: 6),
               _Pill(
@@ -123,7 +140,10 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 value: p.caloriesKcal != null
                     ? '${p.caloriesKcal!.round()}'
                     : '--',
-                goal: '500',
+                goal: '2K',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const CaloriesScreen()),
+                ),
               ),
               const SizedBox(width: 6),
               _Pill(
@@ -131,6 +151,9 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 label: 'WATER',
                 value: _fmtWater(p.waterMl),
                 goal: '2L',
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const WaterScreen()),
+                ),
               ),
             ],
           ),
@@ -169,18 +192,22 @@ class _Pill extends StatelessWidget {
   final String label;
   final String value;
   final String goal;
+  final VoidCallback? onTap;
 
   const _Pill({
     required this.color,
     required this.label,
     required this.value,
     required this.goal,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Container(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.08),
@@ -234,6 +261,7 @@ class _Pill extends StatelessWidget {
             ),
           ],
         ),
+      ),
       ),
     );
   }

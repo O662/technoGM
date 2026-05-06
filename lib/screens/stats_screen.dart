@@ -1344,6 +1344,7 @@ class _CalendarTabState extends State<_CalendarTab> {
   late DateTime _focusedMonth;
   final Map<String, int?> _stepsByDay = {};
   final Map<String, double> _waterByDay = {};
+  final Map<String, double?> _calsByDay = {};
 
   @override
   void initState() {
@@ -1370,14 +1371,17 @@ class _CalendarTabState extends State<_CalendarTab> {
     final results = await Future.wait([
       Future.wait(dates.map(StepService.stepsForDay)),
       Future.wait(dates.map(WaterService.getWaterForDay)),
+      Future.wait(dates.map(StepService.caloriesForDay)),
     ]);
     if (!mounted) return;
     final steps = results[0] as List<int?>;
     final water = results[1] as List<double>;
+    final cals = results[2] as List<double?>;
     setState(() {
       for (int i = 0; i < dates.length; i++) {
         _stepsByDay[_dayKey(dates[i])] = steps[i];
         _waterByDay[_dayKey(dates[i])] = water[i];
+        _calsByDay[_dayKey(dates[i])] = cals[i];
       }
     });
   }
@@ -1476,6 +1480,7 @@ class _CalendarTabState extends State<_CalendarTab> {
           workoutsByDay: workoutsByDay,
           stepsByDay: _stepsByDay,
           waterByDay: _waterByDay,
+          calsByDay: _calsByDay,
           weeklySessionGoal: provider.data.streak.weeklySessionGoal,
           onDayTapped: (date) => _openWeekView(context, date, workouts),
         ),
@@ -1533,6 +1538,7 @@ class _CalendarGrid extends StatelessWidget {
   final Map<String, List<CompletedWorkout>> workoutsByDay;
   final Map<String, int?> stepsByDay;
   final Map<String, double> waterByDay;
+  final Map<String, double?> calsByDay;
   final int weeklySessionGoal;
   final void Function(DateTime) onDayTapped;
 
@@ -1541,6 +1547,7 @@ class _CalendarGrid extends StatelessWidget {
     required this.workoutsByDay,
     required this.stepsByDay,
     required this.waterByDay,
+    required this.calsByDay,
     required this.weeklySessionGoal,
     required this.onDayTapped,
   });
@@ -1612,6 +1619,7 @@ class _CalendarGrid extends StatelessWidget {
                 final dayWorkouts = workoutsByDay[_dayKey(date)] ?? [];
                 final steps = stepsByDay[_dayKey(date)];
                 final water = waterByDay[_dayKey(date)] ?? 0.0;
+                final cals = calsByDay[_dayKey(date)];
 
                 return Expanded(
                   child: GestureDetector(
@@ -1621,6 +1629,7 @@ class _CalendarGrid extends StatelessWidget {
                       workouts: dayWorkouts,
                       steps: steps,
                       water: water,
+                      calories: cals,
                       isToday: _isToday(date),
                       typeColor: _typeColor,
                     ),
@@ -1642,6 +1651,7 @@ class _DayCell extends StatelessWidget {
   final List<CompletedWorkout> workouts;
   final int? steps;
   final double water;
+  final double? calories;
   final bool isToday;
   final Color Function(WorkoutType) typeColor;
 
@@ -1652,6 +1662,7 @@ class _DayCell extends StatelessWidget {
     required this.water,
     required this.isToday,
     required this.typeColor,
+    this.calories,
   });
 
   static Color _stepColor(int s) {
@@ -1680,6 +1691,7 @@ class _DayCell extends StatelessWidget {
     final isFuture = cellDay.isAfter(today);
     final hasWorkout = workouts.isNotEmpty;
     final showSteps = steps != null && steps! > 0 && !isFuture;
+    final showCals = calories != null && calories! > 0 && !isFuture;
     final showWater = water > 0 && !isFuture;
 
     return Container(
@@ -1759,6 +1771,19 @@ class _DayCell extends StatelessWidget {
             )
           else
             const SizedBox(height: 9),
+          const SizedBox(height: 2),
+          // Calories
+          if (showCals)
+            Text(
+              '${calories!.round()}cal',
+              style: GoogleFonts.orbitron(
+                color: TechnoColors.neonOrange,
+                fontSize: 6,
+                fontWeight: FontWeight.w600,
+              ),
+            )
+          else
+            const SizedBox(height: 8),
           const SizedBox(height: 2),
           // Water
           if (showWater)

@@ -511,9 +511,23 @@ class _MuscleChartTabState extends State<MuscleChartTab> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
-          _ToggleBtn(label: 'FRONT', active: _showFront, onTap: () => setState(() { _showFront = true; })),
+          _ToggleBtn(
+            label: 'FRONT',
+            active: _showFront,
+            onTap: () => setState(() {
+              _showFront = true;
+              _selected = null;
+            }),
+          ),
           const SizedBox(width: 8),
-          _ToggleBtn(label: 'BACK', active: !_showFront, onTap: () => setState(() { _showFront = false; })),
+          _ToggleBtn(
+            label: 'BACK',
+            active: !_showFront,
+            onTap: () => setState(() {
+              _showFront = false;
+              _selected = null;
+            }),
+          ),
           const Spacer(),
           if (_selected != null)
             GestureDetector(

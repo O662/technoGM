@@ -57,6 +57,7 @@ class _OnboardingQuestionnaireScreenState
   String _name = '';
   double _heightCm = 175;
   double _weightKg = 70;
+  int _age = 25;
   bool _preferKg = true;   // set by weight picker unit wheel
   bool _preferCm = true;   // set by height picker unit toggle
   FitnessLevel _fitnessLevel = FitnessLevel.intermediate;
@@ -117,6 +118,9 @@ class _OnboardingQuestionnaireScreenState
       goalWeightKg: _goals.contains(FitnessGoal.loseWeight)
           ? (_goalWeightKg ?? _defaultGoalWeightKg)
           : null,
+      // Default water unit follows the dominant unit system the user picked.
+      waterUnit: (_preferKg || _preferCm) ? WaterUnit.ml : WaterUnit.flOz,
+      age: _age,
     );
     await provider.completeOnboarding(
       profile: profile,
@@ -187,10 +191,11 @@ class _OnboardingQuestionnaireScreenState
                     name: _name,
                     onChanged: (v) => setState(() => _name = v),
                   ),
-                  // 1 — Height & Weight
+                  // 1 — Height & Weight & Age
                   _StepHeightWeight(
                     heightCm: _heightCm,
                     weightKg: _weightKg,
+                    age: _age,
                     preferKg: _preferKg,
                     preferCm: _preferCm,
                     onHeightChanged: (cm, isCm) => setState(() {
@@ -201,6 +206,7 @@ class _OnboardingQuestionnaireScreenState
                       _weightKg = kg;
                       _preferKg = isKg;
                     }),
+                    onAgeChanged: (v) => setState(() => _age = v),
                   ),
                   // 2 — Fitness Level
                   _StepFitnessLevel(
@@ -273,6 +279,7 @@ class _StepName extends StatefulWidget {
 class _StepNameState extends State<_StepName> {
   late final TextEditingController _ctrl;
   final _focusNode = FocusNode();
+  Animation<double>? _routeAnimation;
 
   @override
   void initState() {
@@ -284,8 +291,11 @@ class _StepNameState extends State<_StepName> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     final route = ModalRoute.of(context);
-    if (route != null && route.animation != null) {
-      route.animation!.addStatusListener(_onRouteAnimated);
+    final animation = route?.animation;
+    if (animation != _routeAnimation) {
+      _routeAnimation?.removeStatusListener(_onRouteAnimated);
+      _routeAnimation = animation;
+      _routeAnimation?.addStatusListener(_onRouteAnimated);
     }
   }
 
@@ -297,6 +307,7 @@ class _StepNameState extends State<_StepName> {
 
   @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimated);
     _ctrl.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -334,18 +345,22 @@ class _StepNameState extends State<_StepName> {
 class _StepHeightWeight extends StatelessWidget {
   final double heightCm;
   final double weightKg;
+  final int age;
   final bool preferKg;
   final bool preferCm;
   final void Function(double cm, bool isCm) onHeightChanged;
   final void Function(double kg, bool isKg) onWeightChanged;
+  final ValueChanged<int> onAgeChanged;
 
   const _StepHeightWeight({
     required this.heightCm,
     required this.weightKg,
+    required this.age,
     required this.preferKg,
     required this.preferCm,
     required this.onHeightChanged,
     required this.onWeightChanged,
+    required this.onAgeChanged,
   });
 
   String _displayHeight() {
@@ -385,11 +400,21 @@ class _StepHeightWeight extends StatelessWidget {
     if (result != null) onWeightChanged(result.kg, result.isKg);
   }
 
+  Future<void> _pickAge(BuildContext context) async {
+    final result = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _AgePickerSheet(initialAge: age),
+    );
+    if (result != null) onAgeChanged(result);
+  }
+
   @override
   Widget build(BuildContext context) {
     return _StepShell(
-      title: 'HEIGHT & WEIGHT',
-      subtitle: 'Tap either card to set your measurements using the scroll wheel.',
+      title: 'HEIGHT, WEIGHT & AGE',
+      subtitle: 'Tap any card to set your measurements using the scroll wheel.',
       child: Column(
         children: [
           _MeasurementCard(
@@ -407,6 +432,14 @@ class _StepHeightWeight extends StatelessWidget {
             color: TechnoColors.neonPink,
             onTap: () => _pickWeight(context),
           ),
+          const SizedBox(height: 16),
+          _MeasurementCard(
+            icon: Icons.cake_outlined,
+            label: 'AGE',
+            value: '$age yrs',
+            color: TechnoColors.neonOrange,
+            onTap: () => _pickAge(context),
+          ),
           const SizedBox(height: 20),
           Text(
             'The unit you pick in the weight picker becomes your app-wide preference.',
@@ -415,6 +448,55 @@ class _StepHeightWeight extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Age Picker Sheet ─────────────────────────────────────────────────────────
+
+class _AgePickerSheet extends StatefulWidget {
+  final int initialAge;
+  const _AgePickerSheet({required this.initialAge});
+
+  @override
+  State<_AgePickerSheet> createState() => _AgePickerSheetState();
+}
+
+class _AgePickerSheetState extends State<_AgePickerSheet> {
+  static const int _minAge = 10;
+  static const int _maxAge = 100;
+
+  late int _selectedAge;
+  late final FixedExtentScrollController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedAge = widget.initialAge.clamp(_minAge, _maxAge);
+    _ctrl = FixedExtentScrollController(
+      initialItem: _selectedAge - _minAge,
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _PickerSheetContainer(
+      title: 'AGE',
+      accentColor: TechnoColors.neonOrange,
+      onDone: () => Navigator.pop(context, _selectedAge),
+      child: _WheelColumn(
+        width: 140,
+        controller: _ctrl,
+        items: List.generate(_maxAge - _minAge + 1, (i) => '${_minAge + i} yrs'),
+        color: TechnoColors.neonOrange,
+        onChanged: (i) => setState(() => _selectedAge = _minAge + i),
       ),
     );
   }

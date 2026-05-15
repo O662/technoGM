@@ -35,6 +35,21 @@ enum EquipmentType {
   fullGym,
 }
 
+enum WaterUnit { ml, flOz, cups }
+
+extension WaterUnitX on WaterUnit {
+  String get label {
+    switch (this) {
+      case WaterUnit.ml:
+        return 'ml';
+      case WaterUnit.flOz:
+        return 'fl oz';
+      case WaterUnit.cups:
+        return 'cups';
+    }
+  }
+}
+
 enum InjuryArea { shoulder, lowerBack, knee, wrist, hip, ankle, elbow, neck }
 
 enum InjurySide { left, right }
@@ -271,6 +286,18 @@ class WorkoutSet {
     'repsOrSeconds': repsOrSeconds,
     'completed': completed,
   };
+
+  WorkoutSet copyWith({
+    double? weight,
+    int? repsOrSeconds,
+    bool? completed,
+  }) {
+    return WorkoutSet(
+      weight: weight ?? this.weight,
+      repsOrSeconds: repsOrSeconds ?? this.repsOrSeconds,
+      completed: completed ?? this.completed,
+    );
+  }
 }
 
 // ─── Workout Exercise Log ─────────────────────────────────────────────────────
@@ -314,6 +341,20 @@ class WorkoutExerciseLog {
 
   double get totalVolume =>
       sets.where((s) => s.completed).fold(0, (sum, s) => sum + s.weight * s.repsOrSeconds);
+
+  WorkoutExerciseLog copyWith({
+    List<WorkoutSet>? sets,
+    String? notes,
+  }) {
+    return WorkoutExerciseLog(
+      exerciseId: exerciseId,
+      exerciseName: exerciseName,
+      primaryMuscle: primaryMuscle,
+      isTimeBased: isTimeBased,
+      sets: sets ?? this.sets,
+      notes: notes ?? this.notes,
+    );
+  }
 }
 
 // ─── Completed Workout ────────────────────────────────────────────────────────
@@ -409,6 +450,10 @@ class StreakData {
   int weeklySessionGoal;
   int weeklyMinutesGoal;
   int weeklyStepDaysGoal;
+  int dailyStepGoal;
+  int dailyActiveMinutesGoal;
+  int dailyCaloriesGoal;
+  int dailyWaterGoalMl;
 
   StreakData({
     this.currentWeekStreak = 0,
@@ -416,6 +461,10 @@ class StreakData {
     this.weeklySessionGoal = 3,
     this.weeklyMinutesGoal = 150,
     this.weeklyStepDaysGoal = 5,
+    this.dailyStepGoal = 10000,
+    this.dailyActiveMinutesGoal = 30,
+    this.dailyCaloriesGoal = 2000,
+    this.dailyWaterGoalMl = 2000,
   });
 
   StreakData.fromJson(Map<String, dynamic> j)
@@ -423,7 +472,11 @@ class StreakData {
       bestWeekStreak = j['bestWeekStreak'] as int? ?? 0,
       weeklySessionGoal = j['weeklySessionGoal'] as int? ?? 3,
       weeklyMinutesGoal = j['weeklyMinutesGoal'] as int? ?? 150,
-      weeklyStepDaysGoal = j['weeklyStepDaysGoal'] as int? ?? 5;
+      weeklyStepDaysGoal = j['weeklyStepDaysGoal'] as int? ?? 5,
+      dailyStepGoal = j['dailyStepGoal'] as int? ?? 10000,
+      dailyActiveMinutesGoal = j['dailyActiveMinutesGoal'] as int? ?? 30,
+      dailyCaloriesGoal = j['dailyCaloriesGoal'] as int? ?? 2000,
+      dailyWaterGoalMl = j['dailyWaterGoalMl'] as int? ?? 2000;
 
   Map<String, dynamic> toJson() => {
     'currentWeekStreak': currentWeekStreak,
@@ -431,6 +484,10 @@ class StreakData {
     'weeklySessionGoal': weeklySessionGoal,
     'weeklyMinutesGoal': weeklyMinutesGoal,
     'weeklyStepDaysGoal': weeklyStepDaysGoal,
+    'dailyStepGoal': dailyStepGoal,
+    'dailyActiveMinutesGoal': dailyActiveMinutesGoal,
+    'dailyCaloriesGoal': dailyCaloriesGoal,
+    'dailyWaterGoalMl': dailyWaterGoalMl,
   };
 }
 
@@ -484,6 +541,8 @@ class UserProfile {
   List<EquipmentType> homeEquipment;
   Map<InjuryArea, List<InjurySide>> injurySides;
   double? goalWeightKg;
+  WaterUnit waterUnit;
+  int age;
 
   UserProfile({
     this.name = '',
@@ -498,6 +557,8 @@ class UserProfile {
     this.homeEquipment = const [],
     this.injurySides = const {},
     this.goalWeightKg,
+    this.waterUnit = WaterUnit.ml,
+    this.age = 25,
   });
 
   UserProfile.fromJson(Map<String, dynamic> j)
@@ -560,7 +621,12 @@ class UserProfile {
               .toList(),
         ),
       ),
-      goalWeightKg = (j['goalWeightKg'] as num?)?.toDouble();
+      goalWeightKg = (j['goalWeightKg'] as num?)?.toDouble(),
+      waterUnit = WaterUnit.values.firstWhere(
+        (e) => e.name == j['waterUnit'],
+        orElse: () => WaterUnit.ml,
+      ),
+      age = j['age'] as int? ?? 25;
 
   Map<String, dynamic> toJson() => {
     'name': name,
@@ -577,8 +643,48 @@ class UserProfile {
       (k, v) => MapEntry(k.name, v.map((s) => s.name).toList()),
     ),
     'goalWeightKg': goalWeightKg,
+    'waterUnit': waterUnit.name,
+    'age': age,
   };
+
+  UserProfile copyWith({
+    String? name,
+    double? heightCm,
+    bool? preferCm,
+    List<InjuryArea>? injuries,
+    FitnessLevel? fitnessLevel,
+    List<MuscleGroup>? focusAreas,
+    List<FitnessGoal>? goals,
+    bool? preferKg,
+    bool? preferGym,
+    List<EquipmentType>? homeEquipment,
+    Map<InjuryArea, List<InjurySide>>? injurySides,
+    Object? goalWeightKg = _sentinel,
+    WaterUnit? waterUnit,
+    int? age,
+  }) {
+    return UserProfile(
+      name: name ?? this.name,
+      heightCm: heightCm ?? this.heightCm,
+      preferCm: preferCm ?? this.preferCm,
+      injuries: injuries ?? this.injuries,
+      fitnessLevel: fitnessLevel ?? this.fitnessLevel,
+      focusAreas: focusAreas ?? this.focusAreas,
+      goals: goals ?? this.goals,
+      preferKg: preferKg ?? this.preferKg,
+      preferGym: preferGym ?? this.preferGym,
+      homeEquipment: homeEquipment ?? this.homeEquipment,
+      injurySides: injurySides ?? this.injurySides,
+      goalWeightKg: identical(goalWeightKg, _sentinel)
+          ? this.goalWeightKg
+          : goalWeightKg as double?,
+      waterUnit: waterUnit ?? this.waterUnit,
+      age: age ?? this.age,
+    );
+  }
 }
+
+const Object _sentinel = Object();
 
 // ─── App Data (root) ──────────────────────────────────────────────────────────
 

@@ -28,8 +28,11 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
     final provider = context.read<AppProvider>();
     final start = provider.activeWorkout?.startTime ?? DateTime.now();
     _elapsed = DateTime.now().difference(start);
+    // Recompute from wall clock so the timer stays accurate after delayed
+    // ticks or app-suspend rather than drifting via += 1s.
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      setState(() => _elapsed += const Duration(seconds: 1));
+      if (!mounted) return;
+      setState(() => _elapsed = DateTime.now().difference(start));
     });
   }
 
@@ -84,6 +87,8 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
       return const SizedBox.shrink();
     }
 
+    final preferKg = provider.data.profile.preferKg;
+
     return Scaffold(
       backgroundColor: TechnoColors.bgPrimary,
       body: Column(
@@ -115,6 +120,7 @@ class _ActiveWorkoutScreenState extends State<ActiveWorkoutScreen> {
                 return _ExerciseCard(
                   log: ex,
                   dbExercise: dbEx,
+                  preferKg: preferKg,
                   onUpdate: (updated) => provider.updateActiveExercise(i, updated),
                   onSetCompleted: () => _startRest(dbEx.restSeconds),
                   onRemove: () => provider.removeExerciseFromActive(i),
@@ -396,6 +402,7 @@ class _RestBanner extends StatelessWidget {
 class _ExerciseCard extends StatefulWidget {
   final WorkoutExerciseLog log;
   final Exercise dbExercise;
+  final bool preferKg;
   final ValueChanged<WorkoutExerciseLog> onUpdate;
   final VoidCallback onSetCompleted;
   final VoidCallback onRemove;
@@ -403,6 +410,7 @@ class _ExerciseCard extends StatefulWidget {
   const _ExerciseCard({
     required this.log,
     required this.dbExercise,
+    required this.preferKg,
     required this.onUpdate,
     required this.onSetCompleted,
     required this.onRemove,
@@ -511,7 +519,9 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                     SizedBox(
                       width: 80,
                       child: Text(
-                        widget.log.isTimeBased ? 'SECONDS' : 'KG',
+                        widget.log.isTimeBased
+                            ? 'SECONDS'
+                            : (widget.preferKg ? 'KG' : 'LBS'),
                         style: _headerStyle,
                         textAlign: TextAlign.center,
                       ),
@@ -535,18 +545,12 @@ class _ExerciseCardState extends State<_ExerciseCard> {
                   setNum: i + 1,
                   set: widget.log.sets[i],
                   isTimeBased: widget.log.isTimeBased,
+                  preferKg: widget.preferKg,
                   onChanged: (updated) {
                     final newSets = List<WorkoutSet>.from(widget.log.sets);
                     final wasCompleted = newSets[i].completed;
                     newSets[i] = updated;
-                    widget.onUpdate(WorkoutExerciseLog(
-                      exerciseId: widget.log.exerciseId,
-                      exerciseName: widget.log.exerciseName,
-                      primaryMuscle: widget.log.primaryMuscle,
-                      isTimeBased: widget.log.isTimeBased,
-                      sets: newSets,
-                      notes: widget.log.notes,
-                    ));
+                    widget.onUpdate(widget.log.copyWith(sets: newSets));
                     if (!wasCompleted && updated.completed) {
                       widget.onSetCompleted();
                     }
@@ -577,14 +581,7 @@ class _ExerciseCardState extends State<_ExerciseCard> {
         repsOrSeconds: lastSet.repsOrSeconds,
       ),
     ];
-    widget.onUpdate(WorkoutExerciseLog(
-      exerciseId: widget.log.exerciseId,
-      exerciseName: widget.log.exerciseName,
-      primaryMuscle: widget.log.primaryMuscle,
-      isTimeBased: widget.log.isTimeBased,
-      sets: newSets,
-      notes: widget.log.notes,
-    ));
+    widget.onUpdate(widget.log.copyWith(sets: newSets));
   }
 }
 
@@ -594,6 +591,7 @@ class _SetRow extends StatefulWidget {
   final int setNum;
   final WorkoutSet set;
   final bool isTimeBased;
+  final bool preferKg;
   final ValueChanged<WorkoutSet> onChanged;
   final VoidCallback? onAddSet;
 
@@ -601,6 +599,7 @@ class _SetRow extends StatefulWidget {
     required this.setNum,
     required this.set,
     required this.isTimeBased,
+    required this.preferKg,
     required this.onChanged,
     this.onAddSet,
   });
@@ -610,16 +609,22 @@ class _SetRow extends StatefulWidget {
 }
 
 class _SetRowState extends State<_SetRow> {
+  static const double _kgPerLb = 0.45359237;
+
   late TextEditingController _weightCtrl;
   late TextEditingController _repsCtrl;
 
   @override
   void initState() {
     super.initState();
-    _weightCtrl = TextEditingController(
-      text: widget.set.weight == 0 ? '' : widget.set.weight.toStringAsFixed(widget.set.weight % 1 == 0 ? 0 : 1),
-    );
+    _weightCtrl = TextEditingController(text: _formatWeightField(widget.set.weight));
     _repsCtrl = TextEditingController(text: '${widget.set.repsOrSeconds}');
+  }
+
+  String _formatWeightField(double kg) {
+    if (kg == 0) return '';
+    final display = widget.preferKg ? kg : kg / _kgPerLb;
+    return display.toStringAsFixed(display % 1 == 0 ? 0 : 1);
   }
 
   @override
@@ -629,13 +634,17 @@ class _SetRowState extends State<_SetRow> {
     super.dispose();
   }
 
+  double _parseWeightToKg() {
+    final raw = double.tryParse(_weightCtrl.text);
+    if (raw == null) return 0;
+    return widget.preferKg ? raw : raw * _kgPerLb;
+  }
+
   void _notify() {
-    final weight = double.tryParse(_weightCtrl.text) ?? 0;
     final reps = int.tryParse(_repsCtrl.text) ?? widget.set.repsOrSeconds;
-    widget.onChanged(WorkoutSet(
-      weight: weight,
+    widget.onChanged(widget.set.copyWith(
+      weight: _parseWeightToKg(),
       repsOrSeconds: reps,
-      completed: widget.set.completed,
     ));
   }
 
@@ -680,7 +689,7 @@ class _SetRowState extends State<_SetRow> {
           ],
           // Reps/seconds field
           SizedBox(
-            width: widget.isTimeBased ? 80 : 80,
+            width: 80,
             child: _NumberField(
               controller: _repsCtrl,
               hint: widget.isTimeBased ? 'sec' : 'reps',
@@ -692,10 +701,9 @@ class _SetRowState extends State<_SetRow> {
           // Complete toggle
           GestureDetector(
             onTap: () {
-              final weight = double.tryParse(_weightCtrl.text) ?? 0;
               final reps = int.tryParse(_repsCtrl.text) ?? widget.set.repsOrSeconds;
-              widget.onChanged(WorkoutSet(
-                weight: weight,
+              widget.onChanged(widget.set.copyWith(
+                weight: _parseWeightToKg(),
                 repsOrSeconds: reps,
                 completed: !isComplete,
               ));

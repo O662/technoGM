@@ -81,6 +81,9 @@ class AppProvider extends ChangeNotifier {
   double? get latestWeight =>
       _data.weightHistory.isEmpty ? null : _data.weightHistory.last.weightKg;
 
+  double? get previousWeight =>
+      _data.weightHistory.length < 2 ? null : _data.weightHistory[_data.weightHistory.length - 2].weightKg;
+
   // ─── Active Workout ────────────────────────────────────────────────────────
 
   void startWorkout({
@@ -146,10 +149,10 @@ class AppProvider extends ChangeNotifier {
     await _save();
     notifyListeners();
 
-    unawaited(HomeWidgetService.updateAll(
-      streak: _data.streak.currentWeekStreak,
-      lastWorkoutName: completed.name,
-    ));
+    unawaited(Future.wait([
+      HomeWidgetService.updateStreak(_data.streak.currentWeekStreak),
+      HomeWidgetService.updateLastWorkout(completed.name),
+    ]));
 
     return completed;
   }
@@ -177,7 +180,8 @@ class AppProvider extends ChangeNotifier {
     DateTime checkWeek = _weekStart(now);
     while (true) {
       final ws = _workoutsInWeek(checkWeek);
-      final stepDays = await StepService.weekStepGoalDays(checkWeek, 10000);
+      final stepDays =
+          await StepService.weekStepGoalDays(checkWeek, streak.dailyStepGoal);
       if (_weekQualifies(ws, streak, stepDays)) {
         streak0++;
         checkWeek = checkWeek.subtract(const Duration(days: 7));
@@ -223,8 +227,10 @@ class AppProvider extends ChangeNotifier {
   }
 
   Future<bool> get thisWeekComplete async {
-    final w = _workoutsInWeek(_weekStart(DateTime.now()));
-    final stepDays = await StepService.weekStepGoalDays(_weekStart(DateTime.now()), 10000);
+    final weekStart = _weekStart(DateTime.now());
+    final w = _workoutsInWeek(weekStart);
+    final stepDays = await StepService.weekStepGoalDays(
+        weekStart, _data.streak.dailyStepGoal);
     return _weekQualifies(w, _data.streak, stepDays);
   }
 
@@ -326,9 +332,20 @@ class AppProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateStreakSettings({int? sessions, int? minutes}) async {
+  Future<void> updateStreakSettings({
+    int? sessions,
+    int? minutes,
+    int? dailySteps,
+    int? dailyActiveMinutes,
+    int? dailyCalories,
+    int? dailyWaterMl,
+  }) async {
     if (sessions != null) _data.streak.weeklySessionGoal = sessions;
     if (minutes != null) _data.streak.weeklyMinutesGoal = minutes;
+    if (dailySteps != null) _data.streak.dailyStepGoal = dailySteps;
+    if (dailyActiveMinutes != null) _data.streak.dailyActiveMinutesGoal = dailyActiveMinutes;
+    if (dailyCalories != null) _data.streak.dailyCaloriesGoal = dailyCalories;
+    if (dailyWaterMl != null) _data.streak.dailyWaterGoalMl = dailyWaterMl;
     await _save();
     notifyListeners();
   }

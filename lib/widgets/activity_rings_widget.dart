@@ -117,7 +117,7 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 color: TechnoColors.neonCyan,
                 label: 'STEPS',
                 value: _fmtSteps(p.steps),
-                goal: '10K',
+                goal: _fmtGoal(p.stepsGoal),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const StepsScreen()),
                 ),
@@ -127,7 +127,7 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 color: TechnoColors.neonGreen,
                 label: 'ACTIVE',
                 value: p.activeMinutes != null ? '${p.activeMinutes}m' : '--',
-                goal: '30m',
+                goal: '${p.activeMinutesGoal}m',
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
                       builder: (_) => const ActiveMinutesScreen()),
@@ -140,7 +140,7 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 value: p.caloriesKcal != null
                     ? '${p.caloriesKcal!.round()}'
                     : '--',
-                goal: '2K',
+                goal: _fmtGoal(p.caloriesGoal.round()),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const CaloriesScreen()),
                 ),
@@ -150,7 +150,7 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
                 color: TechnoColors.neonPurple,
                 label: 'WATER',
                 value: _fmtWater(p.waterMl),
-                goal: '2L',
+                goal: _fmtWater(p.waterGoalMl),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(builder: (_) => const WaterScreen()),
                 ),
@@ -177,6 +177,11 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
   static final _numFmt = NumberFormat('#,###');
 
   static String _fmtSteps(int? s) => s != null ? _numFmt.format(s) : '--';
+
+  static String _fmtGoal(int n) {
+    if (n % 1000 == 0) return '${n ~/ 1000}K';
+    return '${(n / 1000).toStringAsFixed(1)}K';
+  }
 
   static String _fmtWater(double? ml) {
     if (ml == null) return '--';

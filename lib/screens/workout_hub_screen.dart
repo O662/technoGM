@@ -24,7 +24,6 @@ class _WorkoutHubScreenState extends State<WorkoutHubScreen>
   int _selectedDuration = 30;
   String? _selectedEquipment;
   String? _selectedBodyPart;
-  String? _selectedFormat;
 
   @override
   void initState() {
@@ -105,7 +104,12 @@ class _WorkoutHubScreenState extends State<WorkoutHubScreen>
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (_) => const GenerateWorkoutScreen()),
+                      builder: (_) => GenerateWorkoutScreen(
+                        presetDuration: _selectedDuration,
+                        presetEquipment: _equipmentPreset(_selectedEquipment),
+                        presetFocusAreas: _bodyPartPreset(_selectedBodyPart),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -195,22 +199,6 @@ class _WorkoutHubScreenState extends State<WorkoutHubScreen>
                   selected: _selectedBodyPart,
                   onSelect: (v) => setState(() =>
                       _selectedBodyPart = _selectedBodyPart == v ? null : v),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'FORMAT',
-                  style: GoogleFonts.orbitron(
-                    color: TechnoColors.textSecondary,
-                    fontSize: 11,
-                    letterSpacing: 2,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                _pillRow(
-                  items: const ['SETS & REPS', 'FOLLOW ALONG'],
-                  selected: _selectedFormat,
-                  onSelect: (v) => setState(() =>
-                      _selectedFormat = _selectedFormat == v ? null : v),
                 ),
                 const SizedBox(height: 32),
               ],
@@ -409,6 +397,77 @@ class _WorkoutHubScreenState extends State<WorkoutHubScreen>
       MaterialPageRoute(builder: (_) => const ActiveWorkoutScreen()),
     );
   }
+
+  static List<EquipmentType>? _equipmentPreset(String? label) {
+    if (label == null) return null;
+    switch (label) {
+      case 'NO EQUIPMENT':
+        return [EquipmentType.none];
+      case 'DUMBBELLS':
+        return [EquipmentType.dumbbells];
+      case 'RESISTANCE BANDS':
+        return [EquipmentType.resistanceBands];
+      case 'BARBELL':
+        return [EquipmentType.barbell];
+      case 'KETTLEBELL':
+        return [EquipmentType.kettlebell];
+      case 'PULL-UP BAR':
+        return [EquipmentType.pullupBar];
+      case 'CABLE MACHINE':
+        return [EquipmentType.cables];
+      case 'FULL GYM':
+        return [EquipmentType.fullGym];
+    }
+    return null;
+  }
+
+  static List<MuscleGroup>? _bodyPartPreset(String? label) {
+    if (label == null) return null;
+    switch (label) {
+      case 'FULL BODY':
+        return [MuscleGroup.fullBody];
+      case 'CHEST':
+        return [MuscleGroup.chest];
+      case 'BACK':
+        return [MuscleGroup.back];
+      case 'SHOULDERS':
+        return [MuscleGroup.shoulders];
+      case 'ARMS':
+        return [MuscleGroup.biceps, MuscleGroup.triceps, MuscleGroup.forearms];
+      case 'BICEPS':
+        return [MuscleGroup.biceps];
+      case 'TRICEPS':
+        return [MuscleGroup.triceps];
+      case 'ABS':
+      case 'CORE':
+        return [MuscleGroup.core];
+      case 'UPPER BODY':
+        return [
+          MuscleGroup.chest,
+          MuscleGroup.back,
+          MuscleGroup.shoulders,
+          MuscleGroup.biceps,
+          MuscleGroup.triceps,
+        ];
+      case 'LOWER BODY':
+      case 'LEGS':
+        return [
+          MuscleGroup.quadriceps,
+          MuscleGroup.hamstrings,
+          MuscleGroup.glutes,
+          MuscleGroup.calves,
+        ];
+      case 'GLUTES':
+        return [MuscleGroup.glutes];
+      case 'HAMSTRINGS':
+        return [MuscleGroup.hamstrings];
+      case 'QUADS':
+        return [MuscleGroup.quadriceps];
+      case 'CALVES':
+        return [MuscleGroup.calves];
+    }
+    return null;
+  }
 }
 
 class _ActiveWorkoutBanner extends StatelessWidget {
@@ -601,54 +660,63 @@ class _PlansTabState extends State<_PlansTab> {
       title: '10-Week Beginner Running Plan',
       meta: '10 weeks · 3 days/week · Cardio',
       color: TechnoColors.neonOrange,
+      daysPerWeek: 3,
     ),
     _PlanInfo(
       emoji: '🔥',
       title: 'Fat Loss Plan',
       meta: '8 weeks · 4 days/week · HIIT + Strength',
       color: TechnoColors.neonYellow,
+      daysPerWeek: 4,
     ),
     _PlanInfo(
       emoji: '💪',
       title: 'Beginner Mass Builder',
       meta: '12 weeks · 4 days/week · Strength',
       color: TechnoColors.neonCyan,
+      daysPerWeek: 4,
     ),
     _PlanInfo(
       emoji: '⚡',
       title: 'Beginner Conditioning Plan',
       meta: '6 weeks · 3 days/week · HIIT',
       color: TechnoColors.neonGreen,
+      daysPerWeek: 3,
     ),
     _PlanInfo(
       emoji: '🧘',
       title: 'Beginner Mobility Program',
       meta: '4 weeks · 5 days/week · Mobility',
       color: TechnoColors.neonPurple,
+      daysPerWeek: 5,
     ),
     _PlanInfo(
       emoji: '🏋️',
       title: 'Strength Foundations',
       meta: '8 weeks · 3 days/week · Strength',
       color: TechnoColors.neonCyan,
+      daysPerWeek: 3,
     ),
     _PlanInfo(
       emoji: '🤸',
       title: '30-Day Flexibility Challenge',
       meta: '4 weeks · 7 days/week · Stretch',
       color: TechnoColors.neonGreen,
+      daysPerWeek: 7,
     ),
     _PlanInfo(
       emoji: '🧱',
       title: 'Bodyweight Build',
       meta: '8 weeks · 4 days/week · Bodyweight',
       color: TechnoColors.neonPurple,
+      daysPerWeek: 4,
     ),
     _PlanInfo(
       emoji: '🚴',
       title: 'Cardio Endurance Builder',
       meta: '6 weeks · 4 days/week · Cardio',
       color: TechnoColors.neonOrange,
+      daysPerWeek: 4,
     ),
   ];
 
@@ -709,16 +777,38 @@ class _PlansTabState extends State<_PlansTab> {
             ),
           ),
           const SizedBox(height: 28),
-          Text(
-            'BROWSE PLANS',
-            style: GoogleFonts.orbitron(
-              color: TechnoColors.textSecondary,
-              fontSize: 11,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 10),
-          ..._plans.map((plan) => Padding(
+          Builder(builder: (_) {
+            final visible =
+                _plans.where((p) => p.daysPerWeek <= _selectedDays).toList();
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'BROWSE PLANS · ${visible.length} MATCH${visible.length == 1 ? '' : 'ES'}',
+                  style: GoogleFonts.orbitron(
+                    color: TechnoColors.textSecondary,
+                    fontSize: 11,
+                    letterSpacing: 2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (visible.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'No plans fit $_selectedDays days/week',
+                        style: GoogleFonts.rajdhani(
+                          color: TechnoColors.textMuted,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          }),
+          ..._plans.where((p) => p.daysPerWeek <= _selectedDays).map((plan) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: GestureDetector(
               onTap: () {
@@ -776,12 +866,14 @@ class _PlanInfo {
   final String title;
   final String meta;
   final Color color;
+  final int daysPerWeek;
 
   const _PlanInfo({
     required this.emoji,
     required this.title,
     required this.meta,
     required this.color,
+    required this.daysPerWeek,
   });
 }
 

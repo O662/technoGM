@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/neon_button.dart';
 import '../widgets/neon_card.dart';
 import 'active_workout_screen.dart';
+import 'equipment_guide_screen.dart';
 
 // ─── Plan Data ────────────────────────────────────────────────────────────────
 
@@ -302,6 +303,16 @@ class _ExercisesScreenState extends State<ExercisesScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('EXERCISES'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.build_outlined, color: TechnoColors.neonCyan),
+            tooltip: 'Equipment guide',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const EquipmentGuideScreen()),
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: TechnoColors.neonCyan,
@@ -758,14 +769,13 @@ class _PlanCard extends StatefulWidget {
 
 class _PlanCardState extends State<_PlanCard> {
   bool _expanded = false;
-
-  List<Exercise> get _exercises {
+  late final List<Exercise> _exercises = () {
     final lookup = {for (final e in kExercises) e.id: e};
     return widget.plan.exerciseIds
         .map((id) => lookup[id])
         .whereType<Exercise>()
         .toList();
-  }
+  }();
 
   void _startPlan(BuildContext context) {
     final provider = context.read<AppProvider>();

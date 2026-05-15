@@ -1,22 +1,28 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import '../models/models.dart';
+import '../providers/app_provider.dart';
 import '../providers/step_provider.dart';
 import '../theme/app_theme.dart';
+import '../widgets/mini_ring.dart';
 import '../widgets/neon_card.dart';
 
 class WaterScreen extends StatelessWidget {
   const WaterScreen({super.key});
 
-  static const _quickAdds = [150.0, 250.0, 500.0];
+  // ml amounts; labels are chosen per-unit in build()
+  static const _quickAddMl = [150.0, 250.0, 500.0];
+  static const _mlPerFlOz = 29.5735;
+  static const _mlPerCup = 240.0;
 
   @override
   Widget build(BuildContext context) {
     final p = context.watch<ActivityRingsProvider>();
+    final unit = context.watch<AppProvider>().data.profile.waterUnit;
     final waterMl = p.waterMl ?? 0;
-    const goalMl = ActivityRingsProvider.waterGoalMl;
+    final goalMl = p.waterGoalMl;
     final entries = p.waterEntries;
     final progress = p.waterProgress.clamp(0.0, 1.0);
 
@@ -66,7 +72,7 @@ class WaterScreen extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  _fmtMl(waterMl),
+                                  _fmtPrimary(waterMl, unit),
                                   style: GoogleFonts.orbitron(
                                     color: TechnoColors.neonPurple,
                                     fontSize: 52,
@@ -78,7 +84,7 @@ class WaterScreen extends StatelessWidget {
                                   padding: const EdgeInsets.only(
                                       bottom: 8, left: 6),
                                   child: Text(
-                                    '/ ${_fmtMl(goalMl)}',
+                                    '/ ${_fmtPrimary(goalMl, unit)}',
                                     style: GoogleFonts.rajdhani(
                                       color: TechnoColors.neonPurple
                                           .withValues(alpha: 0.5),
@@ -90,7 +96,7 @@ class WaterScreen extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            '${_fmtOz(waterMl)} · ${_fmtCups(waterMl)}',
+                            _fmtSecondary(waterMl, unit),
                             style: GoogleFonts.rajdhani(
                               color: TechnoColors.neonPurple
                                   .withValues(alpha: 0.55),
@@ -109,7 +115,7 @@ class WaterScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    _MiniRing(progress: progress),
+                    MiniRing(progress: progress, color: TechnoColors.neonPurple),
                   ],
                 ),
               ),
@@ -121,14 +127,15 @@ class WaterScreen extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
               child: Row(
-                children: _quickAdds.map((ml) {
+                children: _quickAddMl.map((ml) {
                   return Expanded(
                     child: Padding(
                       padding: EdgeInsets.only(
-                        right: ml == _quickAdds.last ? 0 : 8,
+                        right: ml == _quickAddMl.last ? 0 : 8,
                       ),
                       child: _QuickAddButton(
                         ml: ml,
+                        unit: unit,
                         onTap: () =>
                             context.read<ActivityRingsProvider>().addWater(ml),
                       ),
@@ -206,7 +213,7 @@ class WaterScreen extends StatelessWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 3),
-                      child: _WaterEntryTile(entry: entry),
+                      child: _WaterEntryTile(entry: entry, unit: unit),
                     ),
                   );
                 },
@@ -220,19 +227,30 @@ class WaterScreen extends StatelessWidget {
     );
   }
 
-  static String _fmtMl(double ml) {
-    if (ml >= 1000) return '${(ml / 1000).toStringAsFixed(1)}L';
-    return '${ml.round()}ml';
+  /// Big number rendered in the user's chosen unit.
+  static String _fmtPrimary(double ml, WaterUnit unit) {
+    switch (unit) {
+      case WaterUnit.ml:
+        if (ml >= 1000) return '${(ml / 1000).toStringAsFixed(1)}L';
+        return '${ml.round()}ml';
+      case WaterUnit.flOz:
+        return '${(ml / _mlPerFlOz).toStringAsFixed(1)} fl oz';
+      case WaterUnit.cups:
+        return '${(ml / _mlPerCup).toStringAsFixed(1)} cups';
+    }
   }
 
-  static String _fmtOz(double ml) {
-    final oz = ml / 29.5735;
-    return '${oz.toStringAsFixed(1)} fl oz';
-  }
-
-  static String _fmtCups(double ml) {
-    final cups = ml / 240.0;
-    return '${cups.toStringAsFixed(1)} cups';
+  /// Subtitle rendered in the *other* unit so users can sanity-check.
+  static String _fmtSecondary(double ml, WaterUnit unit) {
+    switch (unit) {
+      case WaterUnit.ml:
+        return '${(ml / _mlPerFlOz).toStringAsFixed(1)} fl oz · '
+            '${(ml / _mlPerCup).toStringAsFixed(1)} cups';
+      case WaterUnit.flOz:
+      case WaterUnit.cups:
+        if (ml >= 1000) return '${(ml / 1000).toStringAsFixed(1)} L';
+        return '${ml.round()} ml';
+    }
   }
 }
 
@@ -240,21 +258,20 @@ class WaterScreen extends StatelessWidget {
 
 class _QuickAddButton extends StatelessWidget {
   final double ml;
+  final WaterUnit unit;
   final VoidCallback onTap;
 
-  const _QuickAddButton({required this.ml, required this.onTap});
-
-  static String _ozLabel(double ml) {
-    final oz = ml / 29.5735;
-    return '${oz.toStringAsFixed(0)} fl oz';
-  }
+  const _QuickAddButton({
+    required this.ml,
+    required this.unit,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     const color = TechnoColors.neonPurple;
-    final mlLabel = ml >= 1000
-        ? '+${(ml / 1000).toStringAsFixed(1)}L'
-        : '+${ml.round()}ml';
+    final primary = '+${WaterScreen._fmtPrimary(ml, unit)}';
+    final secondary = WaterScreen._fmtSecondary(ml, unit);
 
     return GestureDetector(
       onTap: onTap,
@@ -270,7 +287,7 @@ class _QuickAddButton extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              mlLabel,
+              primary,
               style: GoogleFonts.orbitron(
                 color: color,
                 fontSize: 12,
@@ -279,7 +296,7 @@ class _QuickAddButton extends StatelessWidget {
               ),
             ),
             Text(
-              _ozLabel(ml),
+              secondary,
               style: GoogleFonts.rajdhani(
                 color: color.withValues(alpha: 0.6),
                 fontSize: 10,
@@ -293,91 +310,14 @@ class _QuickAddButton extends StatelessWidget {
   }
 }
 
-// ── Mini ring ─────────────────────────────────────────────────────────────────
-
-class _MiniRing extends StatelessWidget {
-  final double progress;
-  const _MiniRing({required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      height: 72,
-      child: CustomPaint(painter: _MiniRingPainter(progress: progress)),
-    );
-  }
-}
-
-class _MiniRingPainter extends CustomPainter {
-  final double progress;
-  const _MiniRingPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = min(size.width, size.height) / 2 - 5;
-    const color = TechnoColors.neonPurple;
-
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = color.withValues(alpha: 0.15)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 9,
-    );
-
-    if (progress <= 0) return;
-
-    final sweep = (progress * 2 * pi).clamp(0.0, 2 * pi);
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    canvas.drawArc(
-      rect,
-      -pi / 2,
-      sweep,
-      false,
-      Paint()
-        ..color = color.withValues(alpha: 0.25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 14
-        ..strokeCap = StrokeCap.round,
-    );
-
-    canvas.drawArc(
-      rect,
-      -pi / 2,
-      sweep,
-      false,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 9
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_MiniRingPainter old) => old.progress != progress;
-}
-
 // ── Water entry tile ──────────────────────────────────────────────────────────
 
 class _WaterEntryTile extends StatelessWidget {
   final WaterEntry entry;
-  const _WaterEntryTile({required this.entry});
+  final WaterUnit unit;
+  const _WaterEntryTile({required this.entry, required this.unit});
 
   static final _timeFmt = DateFormat('h:mm a');
-
-  static String _mlLabel(double ml) =>
-      ml >= 1000 ? '${(ml / 1000).toStringAsFixed(1)} L' : '${ml.round()} ml';
-
-  static String _ozLabel(double ml) =>
-      '${(ml / 29.5735).toStringAsFixed(1)} fl oz';
-
-  static String _cupsLabel(double ml) =>
-      '${(ml / 240.0).toStringAsFixed(1)} cups';
 
   @override
   Widget build(BuildContext context) {
@@ -430,7 +370,7 @@ class _WaterEntryTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                _mlLabel(entry.ml),
+                WaterScreen._fmtPrimary(entry.ml, unit),
                 style: GoogleFonts.orbitron(
                   color: color,
                   fontSize: 13,
@@ -438,7 +378,7 @@ class _WaterEntryTile extends StatelessWidget {
                 ),
               ),
               Text(
-                '${_ozLabel(entry.ml)} · ${_cupsLabel(entry.ml)}',
+                WaterScreen._fmtSecondary(entry.ml, unit),
                 style: GoogleFonts.rajdhani(
                   color: color.withValues(alpha: 0.55),
                   fontSize: 10,

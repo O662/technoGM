@@ -33,7 +33,13 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: provider),
-        ChangeNotifierProvider(create: (_) => ActivityRingsProvider()),
+        ChangeNotifierProvider(create: (_) => ActivityRingsProvider(
+          initialStepsGoal: provider.data.streak.dailyStepGoal,
+          initialCaloriesGoal: provider.data.streak.dailyCaloriesGoal.toDouble(),
+          initialActiveMinutesGoal: provider.data.streak.dailyActiveMinutesGoal,
+          initialWaterGoalMl: provider.data.streak.dailyWaterGoalMl.toDouble(),
+          initialWeeklyStepDaysGoal: provider.data.streak.weeklyStepDaysGoal,
+        )),
       ],
       child: const TechnoGMApp(),
     ),

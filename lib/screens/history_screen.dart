@@ -530,13 +530,14 @@ class _WorkoutHistoryCardState extends State<WorkoutHistoryCard> {
                               ),
                             ),
                             const Spacer(),
-                            Text(
-                              '${ex.sets.length} × ${ex.sets.first.repsOrSeconds}${ex.isTimeBased ? "s" : ""}',
-                              style: GoogleFonts.rajdhani(
-                                color: TechnoColors.textSecondary,
-                                fontSize: 13,
+                            if (ex.sets.isNotEmpty)
+                              Text(
+                                '${ex.sets.length} × ${ex.sets.first.repsOrSeconds}${ex.isTimeBased ? "s" : ""}',
+                                style: GoogleFonts.rajdhani(
+                                  color: TechnoColors.textSecondary,
+                                  fontSize: 13,
+                                ),
                               ),
-                            ),
                           ],
                         ),
                       ),

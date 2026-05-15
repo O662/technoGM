@@ -20,12 +20,29 @@ class ActivityRingsProvider extends ChangeNotifier {
   RingsStatus _status = RingsStatus.idle;
   DateTime? _lastSynced;
   Timer? _timer;
+  int _stepsGoal;
+  double _caloriesGoal;
+  int _activeMinutesGoal;
+  double _waterGoalMl;
+  int _weeklyStepDaysGoal;
 
-  static const int stepsGoal = 10000;
-  static const double caloriesGoal = 2000.0;
-  static const int activeMinutesGoal = 30;
-  static const double waterGoalMl = 2000.0;
-  static const int weeklyStepDaysGoal = 5;
+  ActivityRingsProvider({
+    int initialStepsGoal = 10000,
+    double initialCaloriesGoal = 2000.0,
+    int initialActiveMinutesGoal = 30,
+    double initialWaterGoalMl = 2000.0,
+    int initialWeeklyStepDaysGoal = 5,
+  })  : _stepsGoal = initialStepsGoal,
+        _caloriesGoal = initialCaloriesGoal,
+        _activeMinutesGoal = initialActiveMinutesGoal,
+        _waterGoalMl = initialWaterGoalMl,
+        _weeklyStepDaysGoal = initialWeeklyStepDaysGoal;
+
+  int get stepsGoal => _stepsGoal;
+  double get caloriesGoal => _caloriesGoal;
+  int get activeMinutesGoal => _activeMinutesGoal;
+  double get waterGoalMl => _waterGoalMl;
+  int get weeklyStepDaysGoal => _weeklyStepDaysGoal;
 
   int? get steps => _steps;
   double? get caloriesKcal => _caloriesKcal;
@@ -40,12 +57,40 @@ class ActivityRingsProvider extends ChangeNotifier {
   DateTime? get lastSynced => _lastSynced;
   bool get isLoading => _status == RingsStatus.loading;
 
-  double get stepsProgress => (_steps ?? 0) / stepsGoal;
-  double get caloriesProgress => (_caloriesKcal ?? 0) / caloriesGoal;
-  double get activeMinutesProgress => (_activeMinutes ?? 0) / activeMinutesGoal;
-  double get waterProgress => (_waterMl ?? 0) / waterGoalMl;
-  double get weeklyStepGoalDaysProgress =>
-      (_weeklyStepGoalDays ?? 0) / weeklyStepDaysGoal;
+  double get stepsProgress => (_steps ?? 0) / _stepsGoal;
+  double get caloriesProgress => (_caloriesKcal ?? 0) / _caloriesGoal;
+  double get activeMinutesProgress => (_activeMinutes ?? 0) / _activeMinutesGoal;
+  double get waterProgress => (_waterMl ?? 0) / _waterGoalMl;
+
+  void setStepsGoal(int goal) {
+    _stepsGoal = goal;
+    notifyListeners();
+    _silentRefresh();
+  }
+
+  void setCaloriesGoal(int goal) {
+    _caloriesGoal = goal.toDouble();
+    notifyListeners();
+  }
+
+  void setActiveMinutesGoal(int goal) {
+    _activeMinutesGoal = goal;
+    notifyListeners();
+  }
+
+  void setWaterGoal(int goalMl) {
+    _waterGoalMl = goalMl.toDouble();
+    notifyListeners();
+  }
+
+  void setWeeklyStepDaysGoal(int days) {
+    _weeklyStepDaysGoal = days;
+    notifyListeners();
+  }
+
+  double get weeklyStepGoalDaysProgress => _weeklyStepDaysGoal == 0
+      ? 0.0
+      : (_weeklyStepGoalDays ?? 0) / _weeklyStepDaysGoal;
 
   Future<void> refresh() async {
     if (_status == RingsStatus.loading) return;

@@ -1118,6 +1118,11 @@ class _ThisWeekCardState extends State<_ThisWeekCard> {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
+    final streak = widget.provider.data.streak;
+    final stepsGoal = streak.dailyStepGoal.toDouble();
+    final activeGoal = streak.dailyActiveMinutesGoal.toDouble();
+    final calsGoal = streak.dailyCaloriesGoal.toDouble();
+    final waterGoal = streak.dailyWaterGoalMl.toDouble();
 
     return NeonCard(
       padding: const EdgeInsets.all(6),
@@ -1150,10 +1155,10 @@ class _ThisWeekCardState extends State<_ThisWeekCard> {
                 child: _MiniRingsCell(
                   date: day,
                   workouts: workoutsByDay[_dayKey(day)] ?? [],
-                  stepsP: (_stepsByIndex[i] ?? 0) / 10000.0,
-                  activeP: (_activeByIndex[i] ?? 0) / 30.0,
-                  calsP: (_calsByIndex[i] ?? 0) / 2000.0,
-                  waterP: (_waterByIndex[i] ?? 0.0) / 2000.0,
+                  stepsP: stepsGoal > 0 ? (_stepsByIndex[i] ?? 0) / stepsGoal : 0,
+                  activeP: activeGoal > 0 ? (_activeByIndex[i] ?? 0) / activeGoal : 0,
+                  calsP: calsGoal > 0 ? (_calsByIndex[i] ?? 0) / calsGoal : 0,
+                  waterP: waterGoal > 0 ? (_waterByIndex[i] ?? 0.0) / waterGoal : 0,
                   isToday: isToday,
                   typeColor: _typeColor,
                 ),
@@ -1482,6 +1487,8 @@ class _CalendarTabState extends State<_CalendarTab> {
           waterByDay: _waterByDay,
           calsByDay: _calsByDay,
           weeklySessionGoal: provider.data.streak.weeklySessionGoal,
+          dailyStepsGoal: provider.data.streak.dailyStepGoal,
+          dailyWaterGoal: provider.data.streak.dailyWaterGoalMl,
           onDayTapped: (date) => _openWeekView(context, date, workouts),
         ),
         const SizedBox(height: 16),
@@ -1540,6 +1547,8 @@ class _CalendarGrid extends StatelessWidget {
   final Map<String, double> waterByDay;
   final Map<String, double?> calsByDay;
   final int weeklySessionGoal;
+  final int dailyStepsGoal;
+  final int dailyWaterGoal;
   final void Function(DateTime) onDayTapped;
 
   const _CalendarGrid({
@@ -1549,6 +1558,8 @@ class _CalendarGrid extends StatelessWidget {
     required this.waterByDay,
     required this.calsByDay,
     required this.weeklySessionGoal,
+    required this.dailyStepsGoal,
+    required this.dailyWaterGoal,
     required this.onDayTapped,
   });
 
@@ -1630,6 +1641,8 @@ class _CalendarGrid extends StatelessWidget {
                       steps: steps,
                       water: water,
                       calories: cals,
+                      stepsGoal: dailyStepsGoal,
+                      waterGoal: dailyWaterGoal,
                       isToday: _isToday(date),
                       typeColor: _typeColor,
                     ),
@@ -1652,6 +1665,8 @@ class _DayCell extends StatelessWidget {
   final int? steps;
   final double water;
   final double? calories;
+  final int stepsGoal;
+  final int waterGoal;
   final bool isToday;
   final Color Function(WorkoutType) typeColor;
 
@@ -1660,20 +1675,22 @@ class _DayCell extends StatelessWidget {
     required this.workouts,
     required this.steps,
     required this.water,
+    required this.stepsGoal,
+    required this.waterGoal,
     required this.isToday,
     required this.typeColor,
     this.calories,
   });
 
-  static Color _stepColor(int s) {
-    if (s >= 10000) return TechnoColors.neonGreen;
-    if (s >= 7000) return TechnoColors.neonYellow;
+  Color _stepColor(int s) {
+    if (s >= stepsGoal) return TechnoColors.neonGreen;
+    if (s >= stepsGoal * 0.7) return TechnoColors.neonYellow;
     return TechnoColors.textMuted;
   }
 
-  static Color _waterColor(double ml) {
-    if (ml >= 2000) return TechnoColors.neonPurple;
-    if (ml >= 1000) return TechnoColors.neonPurple.withValues(alpha: 0.6);
+  Color _waterColor(double ml) {
+    if (ml >= waterGoal) return TechnoColors.neonPurple;
+    if (ml >= waterGoal * 0.5) return TechnoColors.neonPurple.withValues(alpha: 0.6);
     return TechnoColors.textMuted;
   }
 
@@ -1894,6 +1911,7 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final streak = context.watch<AppProvider>().data.streak;
     final ws = _weekStart;
     final we = ws.add(const Duration(days: 6));
     final days = List.generate(7, (i) => ws.add(Duration(days: i)));
@@ -1997,6 +2015,8 @@ class _WeekViewSheetState extends State<_WeekViewSheet> {
                 workouts: dayWorkouts,
                 steps: _stepsByIndex[i],
                 water: _waterByIndex[i] ?? 0.0,
+                stepsGoal: streak.dailyStepGoal,
+                waterGoal: streak.dailyWaterGoalMl,
                 isToday: _sameDay(day, DateTime.now()),
                 isSelected: _sameDay(day, widget.selectedDate),
                 typeColor: _typeColor,
@@ -2064,6 +2084,8 @@ class _WeekDayRow extends StatelessWidget {
   final List<CompletedWorkout> workouts;
   final int? steps;
   final double water;
+  final int stepsGoal;
+  final int waterGoal;
   final bool isToday;
   final bool isSelected;
   final Color Function(WorkoutType) typeColor;
@@ -2073,20 +2095,22 @@ class _WeekDayRow extends StatelessWidget {
     required this.workouts,
     required this.steps,
     required this.water,
+    required this.stepsGoal,
+    required this.waterGoal,
     required this.isToday,
     required this.isSelected,
     required this.typeColor,
   });
 
-  static Color _stepColor(int s) {
-    if (s >= 10000) return TechnoColors.neonGreen;
-    if (s >= 7000) return TechnoColors.neonYellow;
+  Color _stepColor(int s) {
+    if (s >= stepsGoal) return TechnoColors.neonGreen;
+    if (s >= stepsGoal * 0.7) return TechnoColors.neonYellow;
     return TechnoColors.textMuted;
   }
 
-  static Color _waterColor(double ml) {
-    if (ml >= 2000) return TechnoColors.neonPurple;
-    if (ml >= 1000) return TechnoColors.neonPurple.withValues(alpha: 0.7);
+  Color _waterColor(double ml) {
+    if (ml >= waterGoal) return TechnoColors.neonPurple;
+    if (ml >= waterGoal * 0.5) return TechnoColors.neonPurple.withValues(alpha: 0.7);
     return TechnoColors.textMuted;
   }
 
@@ -2187,7 +2211,7 @@ class _WeekDayRow extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (steps! >= 10000) ...[
+                      if (steps! >= stepsGoal) ...[
                         const SizedBox(width: 4),
                         Text(
                           '✓',
@@ -2215,7 +2239,7 @@ class _WeekDayRow extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (water >= 2000) ...[
+                      if (water >= waterGoal) ...[
                         const SizedBox(width: 4),
                         Text(
                           '✓',

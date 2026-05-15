@@ -12,11 +12,15 @@ import 'active_workout_screen.dart';
 class GenerateWorkoutScreen extends StatefulWidget {
   final WorkoutType? presetType;
   final List<EquipmentType>? presetEquipment;
+  final List<MuscleGroup>? presetFocusAreas;
+  final int? presetDuration;
 
   const GenerateWorkoutScreen({
     super.key,
     this.presetType,
     this.presetEquipment,
+    this.presetFocusAreas,
+    this.presetDuration,
   });
 
   @override
@@ -48,6 +52,14 @@ class _GenerateWorkoutScreenState extends State<GenerateWorkoutScreen> {
         ..addAll(widget.presetEquipment!);
     } else if (_atGym) {
       _equipment.add(EquipmentType.fullGym);
+    }
+    if (widget.presetFocusAreas != null && widget.presetFocusAreas!.isNotEmpty) {
+      _focusAreas
+        ..clear()
+        ..addAll(widget.presetFocusAreas!);
+    }
+    if (widget.presetDuration != null) {
+      _duration = widget.presetDuration!;
     }
   }
 
@@ -243,7 +255,7 @@ class _ConfigPane extends StatelessWidget {
           ],
 
           // Duration
-          _SectionHeader(label: 'DURATION: ${duration} MIN'),
+          _SectionHeader(label: 'DURATION: $duration MIN'),
           Slider(
             value: duration.toDouble(),
             min: 15,
@@ -583,15 +595,16 @@ class _PreviewPane extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          Text(
-                            ex.isTimeBased
-                                ? '${ex.sets.first.repsOrSeconds}s'
-                                : '${ex.sets.first.repsOrSeconds} reps',
-                            style: GoogleFonts.rajdhani(
-                              color: TechnoColors.textMuted,
-                              fontSize: 12,
+                          if (ex.sets.isNotEmpty)
+                            Text(
+                              ex.isTimeBased
+                                  ? '${ex.sets.first.repsOrSeconds}s'
+                                  : '${ex.sets.first.repsOrSeconds} reps',
+                              style: GoogleFonts.rajdhani(
+                                color: TechnoColors.textMuted,
+                                fontSize: 12,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],

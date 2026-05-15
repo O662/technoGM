@@ -25,6 +25,8 @@ class HomeWidgetService {
     await HomeWidget.registerInteractivityCallback(homeWidgetBackgroundCallback);
   }
 
+  /// Only the fields that are explicitly provided are written — null fields
+  /// are left untouched so partial updates don't clobber existing values.
   static Future<void> updateAll({
     int? steps,
     double? calories,
@@ -33,14 +35,27 @@ class HomeWidgetService {
     int? streak,
     String? lastWorkoutName,
   }) async {
-    await Future.wait([
-      HomeWidget.saveWidgetData<int>('steps', steps ?? 0),
-      HomeWidget.saveWidgetData<int>('calories', (calories ?? 0).round()),
-      HomeWidget.saveWidgetData<int>('active_minutes', activeMinutes ?? 0),
-      HomeWidget.saveWidgetData<int>('water_ml', (waterMl ?? 0).round()),
-      HomeWidget.saveWidgetData<int>('streak', streak ?? 0),
-      HomeWidget.saveWidgetData<String>('last_workout', lastWorkoutName ?? ''),
-    ]);
+    final writes = <Future<void>>[];
+    if (steps != null) {
+      writes.add(HomeWidget.saveWidgetData<int>('steps', steps));
+    }
+    if (calories != null) {
+      writes.add(HomeWidget.saveWidgetData<int>('calories', calories.round()));
+    }
+    if (activeMinutes != null) {
+      writes.add(HomeWidget.saveWidgetData<int>('active_minutes', activeMinutes));
+    }
+    if (waterMl != null) {
+      writes.add(HomeWidget.saveWidgetData<int>('water_ml', waterMl.round()));
+    }
+    if (streak != null) {
+      writes.add(HomeWidget.saveWidgetData<int>('streak', streak));
+    }
+    if (lastWorkoutName != null) {
+      writes.add(HomeWidget.saveWidgetData<String>('last_workout', lastWorkoutName));
+    }
+    if (writes.isEmpty) return;
+    await Future.wait(writes);
     await _triggerAll();
   }
 

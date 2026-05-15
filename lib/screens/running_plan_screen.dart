@@ -64,6 +64,22 @@ const _weeks = [
   _RunWeek(week: 10, runMin: 30, walkMin: 0, cycles: 1),
 ];
 
+Color _colorForWeek(int week) {
+  const colors = [
+    TechnoColors.neonGreen,
+    TechnoColors.neonCyan,
+    TechnoColors.neonCyan,
+    TechnoColors.neonCyan,
+    TechnoColors.neonYellow,
+    TechnoColors.neonYellow,
+    TechnoColors.neonOrange,
+    TechnoColors.neonOrange,
+    TechnoColors.neonPink,
+    TechnoColors.neonPink,
+  ];
+  return colors[(week - 1).clamp(0, colors.length - 1)];
+}
+
 const _scheduleDays = [
   _DayEntry(label: 'MON', isTraining: true),
   _DayEntry(label: 'TUE', isTraining: false),
@@ -262,22 +278,6 @@ class _WeekTile extends StatelessWidget {
       builder: (_) => _WeekScheduleSheet(week: week),
     );
   }
-
-  Color _colorForWeek(int w) {
-    const colors = [
-      TechnoColors.neonGreen,
-      TechnoColors.neonCyan,
-      TechnoColors.neonCyan,
-      TechnoColors.neonCyan,
-      TechnoColors.neonYellow,
-      TechnoColors.neonYellow,
-      TechnoColors.neonOrange,
-      TechnoColors.neonOrange,
-      TechnoColors.neonPink,
-      TechnoColors.neonPink,
-    ];
-    return colors[(w - 1).clamp(0, colors.length - 1)];
-  }
 }
 
 // ── Week Schedule Bottom Sheet ───────────────────────────────────────────────
@@ -286,25 +286,9 @@ class _WeekScheduleSheet extends StatelessWidget {
   final _RunWeek week;
   const _WeekScheduleSheet({required this.week});
 
-  Color _weekColor(int w) {
-    const colors = [
-      TechnoColors.neonGreen,
-      TechnoColors.neonCyan,
-      TechnoColors.neonCyan,
-      TechnoColors.neonCyan,
-      TechnoColors.neonYellow,
-      TechnoColors.neonYellow,
-      TechnoColors.neonOrange,
-      TechnoColors.neonOrange,
-      TechnoColors.neonPink,
-      TechnoColors.neonPink,
-    ];
-    return colors[(w - 1).clamp(0, colors.length - 1)];
-  }
-
   @override
   Widget build(BuildContext context) {
-    final color = _weekColor(week.week);
+    final color = _colorForWeek(week.week);
 
     return DraggableScrollableSheet(
       initialChildSize: 0.75,

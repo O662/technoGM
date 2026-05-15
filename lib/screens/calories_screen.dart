@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -6,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../providers/step_provider.dart';
 import '../services/step_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/mini_ring.dart';
 import '../widgets/neon_card.dart';
 
 class CaloriesScreen extends StatelessWidget {
@@ -17,7 +17,7 @@ class CaloriesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.watch<ActivityRingsProvider>();
     final kcal = p.caloriesKcal ?? 0;
-    final goal = ActivityRingsProvider.caloriesGoal;
+    final goal = p.caloriesGoal;
     final entries = p.calorieEntries;
     final progress = p.caloriesProgress.clamp(0.0, 1.0);
 
@@ -101,7 +101,7 @@ class CaloriesScreen extends StatelessWidget {
                         ],
                       ),
                     ),
-                    _MiniRing(progress: progress),
+                    MiniRing(progress: progress, color: TechnoColors.neonOrange),
                   ],
                 ),
               ),
@@ -162,75 +162,6 @@ class CaloriesScreen extends StatelessWidget {
       ),
     );
   }
-}
-
-// ── Mini ring ─────────────────────────────────────────────────────────────────
-
-class _MiniRing extends StatelessWidget {
-  final double progress;
-  const _MiniRing({required this.progress});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 72,
-      height: 72,
-      child: CustomPaint(painter: _MiniRingPainter(progress: progress)),
-    );
-  }
-}
-
-class _MiniRingPainter extends CustomPainter {
-  final double progress;
-  const _MiniRingPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = min(size.width, size.height) / 2 - 5;
-    const color = TechnoColors.neonOrange;
-
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..color = color.withValues(alpha: 0.15)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 9,
-    );
-
-    if (progress <= 0) return;
-
-    final sweep = (progress * 2 * pi).clamp(0.0, 2 * pi);
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    canvas.drawArc(
-      rect,
-      -pi / 2,
-      sweep,
-      false,
-      Paint()
-        ..color = color.withValues(alpha: 0.25)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 14
-        ..strokeCap = StrokeCap.round,
-    );
-
-    canvas.drawArc(
-      rect,
-      -pi / 2,
-      sweep,
-      false,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 9
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_MiniRingPainter old) => old.progress != progress;
 }
 
 // ── Calorie entry tile ────────────────────────────────────────────────────────

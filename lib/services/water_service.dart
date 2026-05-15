@@ -7,21 +7,15 @@ class WaterEntry {
 }
 
 class WaterService {
-  static const double dailyGoalMl = 2000.0;
-
-  static String _todayKey() {
+  static String _dateSuffix() {
     final n = DateTime.now();
     final m = n.month.toString().padLeft(2, '0');
     final d = n.day.toString().padLeft(2, '0');
-    return 'water_ml_${n.year}_${m}_$d';
+    return '${n.year}_${m}_$d';
   }
 
-  static String _entriesKey() {
-    final n = DateTime.now();
-    final m = n.month.toString().padLeft(2, '0');
-    final d = n.day.toString().padLeft(2, '0');
-    return 'water_entries_${n.year}_${m}_$d';
-  }
+  static String _todayKey() => 'water_ml_${_dateSuffix()}';
+  static String _entriesKey() => 'water_entries_${_dateSuffix()}';
 
   static Future<double> getTodayWater() async {
     final prefs = await SharedPreferences.getInstance();
@@ -80,10 +74,5 @@ class WaterService {
     }).clamp(0.0, 9999.0);
     await prefs.setDouble(_todayKey(), newTotal);
     return newTotal;
-  }
-
-  static Future<void> setWater(double ml) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_todayKey(), ml.clamp(0.0, 9999.0));
   }
 }

@@ -226,14 +226,6 @@ class AppProvider extends ChangeNotifier {
         .fold(0, (sum, w) => sum + w.durationMinutes);
   }
 
-  Future<bool> get thisWeekComplete async {
-    final weekStart = _weekStart(DateTime.now());
-    final w = _workoutsInWeek(weekStart);
-    final stepDays = await StepService.weekStepGoalDays(
-        weekStart, _data.streak.dailyStepGoal);
-    return _weekQualifies(w, _data.streak, stepDays);
-  }
-
   // ─── Personal Records ──────────────────────────────────────────────────────
 
   void _updatePRs(CompletedWorkout workout) {
@@ -272,18 +264,6 @@ class AppProvider extends ChangeNotifier {
       result.add(_workoutsInWeek(ws).length);
     }
     return result;
-  }
-
-  /// Total volume per muscle group (for pie chart)
-  Map<MuscleGroup, double> volumeByMuscle() {
-    final map = <MuscleGroup, double>{};
-    for (final w in _data.workouts) {
-      for (final ex in w.exercises) {
-        final v = ex.totalVolume;
-        map[ex.primaryMuscle] = (map[ex.primaryMuscle] ?? 0) + v;
-      }
-    }
-    return map;
   }
 
   /// Workout type distribution

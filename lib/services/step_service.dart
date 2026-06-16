@@ -68,6 +68,13 @@ class ActivityResult {
   const ActivityResult({required this.minutes, required this.entries});
 }
 
+/// Holds a day's calorie total and the underlying records from a single read.
+class CalorieResult {
+  final double? totalKcal; // null = no calorie type could be read at all
+  final List<CalorieEntry> entries;
+  const CalorieResult({required this.totalKcal, required this.entries});
+}
+
 class StepService {
   static final _health = Health();
   static bool _configured = false;
@@ -157,88 +164,55 @@ class StepService {
     return results.where((s) => (s ?? 0) >= goal).length;
   }
 
-  static Future<double?> todayActiveCaloriesKcal() async {
-    try {
-      await _configure();
-      if (!_available) return null;
-      final start = _todayStart();
-      final records = await _health.getHealthDataFromTypes(
-        types: [HealthDataType.ACTIVE_ENERGY_BURNED],
-        startTime: start,
-        endTime: start.add(const Duration(days: 1)),
-      );
-      return records.fold<double>(
-        0.0,
-        (s, p) => s + (p.value as NumericHealthValue).numericValue.toDouble(),
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static Future<double?> todayTotalCaloriesKcal() async =>
-      _caloriesKcalFor(_todayStart());
+  static Future<CalorieResult> todayCalorieData() async =>
+      _calorieDataFor(_todayStart());
 
   static Future<double?> caloriesForDay(DateTime day) async =>
-      _caloriesKcalFor(DateTime(day.year, day.month, day.day));
+      (await _calorieDataFor(DateTime(day.year, day.month, day.day))).totalKcal;
 
-  static Future<double?> _caloriesKcalFor(DateTime dayStart) async {
-    try {
-      await _configure();
-      if (!_available) return null;
-      final end = dayStart.add(const Duration(days: 1));
-      // Try TOTAL_CALORIES_BURNED first; fall back to ACTIVE_ENERGY_BURNED
-      // because some sources (e.g. Samsung Health) only write the latter.
-      for (final type in [
-        HealthDataType.TOTAL_CALORIES_BURNED,
-        HealthDataType.ACTIVE_ENERGY_BURNED,
-      ]) {
+  /// Reads [dayStart]'s calories with a single Health Connect query and returns
+  /// both the total and the underlying records, so callers that need both (the
+  /// rings refresh) don't query the calorie types twice.
+  ///
+  /// Prefers TOTAL_CALORIES_BURNED, then falls back to ACTIVE_ENERGY_BURNED
+  /// because some sources (e.g. Samsung Health) only write the latter. Each
+  /// type is read inside its own try/catch so a missing permission or read
+  /// error on one type (e.g. TOTAL not granted) does not suppress the other
+  /// (e.g. ACTIVE, which the user did grant).
+  static Future<CalorieResult> _calorieDataFor(DateTime dayStart) async {
+    await _configure();
+    if (!_available) return const CalorieResult(totalKcal: null, entries: []);
+    final end = dayStart.add(const Duration(days: 1));
+    bool didRead = false;
+    for (final type in [
+      HealthDataType.TOTAL_CALORIES_BURNED,
+      HealthDataType.ACTIVE_ENERGY_BURNED,
+    ]) {
+      try {
         final records = await _health.getHealthDataFromTypes(
           types: [type],
           startTime: dayStart,
           endTime: end,
         );
-        if (records.isEmpty) continue;
-        return records.fold<double>(
-          0.0,
-          (s, p) => s + (p.value as NumericHealthValue).numericValue.toDouble(),
-        );
-      }
-      return 0.0;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  static Future<List<CalorieEntry>> todayCalorieEntries() async {
-    try {
-      await _configure();
-      if (!_available) return [];
-      final start = _todayStart();
-      final end = start.add(const Duration(days: 1));
-      for (final type in [
-        HealthDataType.TOTAL_CALORIES_BURNED,
-        HealthDataType.ACTIVE_ENERGY_BURNED,
-      ]) {
-        final records = await _health.getHealthDataFromTypes(
-          types: [type],
-          startTime: start,
-          endTime: end,
-        );
-        if (records.isEmpty) continue;
+        didRead = true;
+        double total = 0.0;
         final entries = <CalorieEntry>[];
         for (final r in records) {
           final kcal = (r.value as NumericHealthValue).numericValue.toDouble();
           if (kcal <= 0) continue;
+          total += kcal;
           entries.add(CalorieEntry(start: r.dateFrom, end: r.dateTo, kcal: kcal));
         }
+        if (entries.isEmpty) continue;
         entries.sort((a, b) => a.start.compareTo(b.start));
-        return entries;
+        return CalorieResult(totalKcal: total, entries: entries);
+      } catch (_) {
+        // No permission or read error for this type — try the next one.
       }
-      return [];
-    } catch (_) {
-      return [];
     }
+    // A successful-but-empty read means 0 kcal logged; if every read failed we
+    // couldn't access calories at all, so report null (shows "--").
+    return CalorieResult(totalKcal: didRead ? 0.0 : null, entries: const []);
   }
 
   // Minimum steps-per-minute to treat a STEPS record as genuine movement.
@@ -251,9 +225,6 @@ class StepService {
   /// start time). Overlapping intervals are counted only once.
   static Future<ActivityResult?> todayActivityData() async =>
       _activityDataFor(_todayStart());
-
-  static Future<int?> todayActiveMinutes() async =>
-      (await todayActivityData())?.minutes;
 
   static Future<int?> activeMinutesForDay(DateTime day) async =>
       (await _activityDataFor(DateTime(day.year, day.month, day.day)))?.minutes;

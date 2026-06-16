@@ -42,3 +42,13 @@ android {
 flutter {
     source = "../.."
 }
+
+// The `home_widget` plugin requests `androidx.glance:glance-appwidget:1.+`,
+// a dynamic version that now resolves to `1.3.0-alpha01`. That alpha requires
+// compileSdk 37 / AGP 9.1.0 and pulls in `compose.remote` alphas, breaking the
+// build. Pin Glance to the latest stable release compatible with this project.
+configurations.all {
+    resolutionStrategy {
+        force("androidx.glance:glance-appwidget:1.1.1")
+    }
+}

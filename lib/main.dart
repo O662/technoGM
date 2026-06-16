@@ -38,7 +38,6 @@ void main() async {
           initialCaloriesGoal: provider.data.streak.dailyCaloriesGoal.toDouble(),
           initialActiveMinutesGoal: provider.data.streak.dailyActiveMinutesGoal,
           initialWaterGoalMl: provider.data.streak.dailyWaterGoalMl.toDouble(),
-          initialWeeklyStepDaysGoal: provider.data.streak.weeklyStepDaysGoal,
         )),
       ],
       child: const TechnoGMApp(),

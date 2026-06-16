@@ -24,25 +24,21 @@ class ActivityRingsProvider extends ChangeNotifier {
   double _caloriesGoal;
   int _activeMinutesGoal;
   double _waterGoalMl;
-  int _weeklyStepDaysGoal;
 
   ActivityRingsProvider({
     int initialStepsGoal = 10000,
     double initialCaloriesGoal = 2000.0,
     int initialActiveMinutesGoal = 30,
     double initialWaterGoalMl = 2000.0,
-    int initialWeeklyStepDaysGoal = 5,
   })  : _stepsGoal = initialStepsGoal,
         _caloriesGoal = initialCaloriesGoal,
         _activeMinutesGoal = initialActiveMinutesGoal,
-        _waterGoalMl = initialWaterGoalMl,
-        _weeklyStepDaysGoal = initialWeeklyStepDaysGoal;
+        _waterGoalMl = initialWaterGoalMl;
 
   int get stepsGoal => _stepsGoal;
   double get caloriesGoal => _caloriesGoal;
   int get activeMinutesGoal => _activeMinutesGoal;
   double get waterGoalMl => _waterGoalMl;
-  int get weeklyStepDaysGoal => _weeklyStepDaysGoal;
 
   int? get steps => _steps;
   double? get caloriesKcal => _caloriesKcal;
@@ -83,15 +79,6 @@ class ActivityRingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setWeeklyStepDaysGoal(int days) {
-    _weeklyStepDaysGoal = days;
-    notifyListeners();
-  }
-
-  double get weeklyStepGoalDaysProgress => _weeklyStepDaysGoal == 0
-      ? 0.0
-      : (_weeklyStepGoalDays ?? 0) / _weeklyStepDaysGoal;
-
   Future<void> refresh() async {
     if (_status == RingsStatus.loading) return;
     _status = RingsStatus.loading;
@@ -130,24 +117,24 @@ class ActivityRingsProvider extends ChangeNotifier {
     final weekStart = _weekStart(DateTime.now());
     final results = await Future.wait([
       StepService.todaySteps(),
-      StepService.todayTotalCaloriesKcal(),
+      StepService.todayCalorieData(),
       StepService.todayActivityData(),
       StepService.todayWaterMl(),
       StepService.weekStepGoalDays(weekStart, stepsGoal),
       StepService.todayStepEntries(),
-      StepService.todayCalorieEntries(),
       WaterService.getTodayEntries(),
     ]);
     _steps = results[0] as int?;
-    _caloriesKcal = results[1] as double?;
+    final calorieResult = results[1] as CalorieResult;
+    _caloriesKcal = calorieResult.totalKcal;
+    _calorieEntries = calorieResult.entries;
     final activityResult = results[2] as ActivityResult?;
     _activeMinutes = activityResult?.minutes;
     _activityEntries = activityResult?.entries ?? [];
     _waterMl = results[3] as double?;
     _weeklyStepGoalDays = results[4] as int;
     _stepEntries = results[5] as List<StepEntry>;
-    _calorieEntries = results[6] as List<CalorieEntry>;
-    _waterEntries = results[7] as List<WaterEntry>;
+    _waterEntries = results[6] as List<WaterEntry>;
     _lastSynced = DateTime.now();
 
     unawaited(HomeWidgetService.updateAll(

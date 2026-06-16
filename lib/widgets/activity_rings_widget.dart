@@ -56,6 +56,10 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      // If Health Connect was just installed via the INSTALL prompt, re-check
+      // on return. Not for `denied` — that would re-pop the permission dialog
+      // on every resume; the GRANT button handles that explicitly.
+      if (_provider?.status == RingsStatus.unavailable) _provider?.refresh();
       if (TickerMode.of(context)) _provider?.startAutoRefresh();
     } else if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.hidden) {
@@ -158,20 +162,45 @@ class _ActivityRingsWidgetState extends State<ActivityRingsWidget>
             ],
           ),
           const SizedBox(height: 20),
-          Text(
-            p.lastSynced != null
-                ? 'LAST SYNCED ${DateFormat('h:mm a').format(p.lastSynced!)}'
-                : 'SYNCING...',
-            style: GoogleFonts.rajdhani(
-              color: TechnoColors.textMuted,
-              fontSize: 10,
-              letterSpacing: 1.5,
-            ),
-          ),
+          _buildFooter(context, p),
           const SizedBox(height: 16),
         ],
       ),
     );
+  }
+
+  /// Footer beneath the rings: the sync timestamp normally, or an actionable
+  /// prompt when Health Connect is unavailable (install) or denied (grant).
+  Widget _buildFooter(BuildContext context, ActivityRingsProvider p) {
+    switch (p.status) {
+      case RingsStatus.unavailable:
+        return _HealthPrompt(
+          message: 'Health Connect needed for activity data',
+          actionLabel: 'INSTALL',
+          color: TechnoColors.neonOrange,
+          onAction: () => p.openInstallPage(),
+        );
+      case RingsStatus.denied:
+        return _HealthPrompt(
+          message: 'Allow health access to see your rings',
+          actionLabel: 'GRANT',
+          color: TechnoColors.neonCyan,
+          onAction: () => p.refresh(),
+        );
+      case RingsStatus.idle:
+      case RingsStatus.loading:
+      case RingsStatus.granted:
+        return Text(
+          p.lastSynced != null
+              ? 'LAST SYNCED ${DateFormat('h:mm a').format(p.lastSynced!)}'
+              : 'SYNCING...',
+          style: GoogleFonts.rajdhani(
+            color: TechnoColors.textMuted,
+            fontSize: 10,
+            letterSpacing: 1.5,
+          ),
+        );
+    }
   }
 
   static final _numFmt = NumberFormat('#,###');
@@ -268,6 +297,63 @@ class _Pill extends StatelessWidget {
         ),
       ),
       ),
+    );
+  }
+}
+
+// ── Health prompt ─────────────────────────────────────────────────────────────
+
+class _HealthPrompt extends StatelessWidget {
+  final String message;
+  final String actionLabel;
+  final Color color;
+  final VoidCallback onAction;
+
+  const _HealthPrompt({
+    required this.message,
+    required this.actionLabel,
+    required this.color,
+    required this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(Icons.health_and_safety_outlined, color: color, size: 15),
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            message,
+            style: GoogleFonts.rajdhani(
+              color: TechnoColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        GestureDetector(
+          onTap: onAction,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.6)),
+            ),
+            child: Text(
+              actionLabel,
+              style: GoogleFonts.orbitron(
+                color: color,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
